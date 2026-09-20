@@ -272,3 +272,92 @@ export interface OutcomeRecord {
   icpCriteriaMatched: string[];
   icpCriteriaMissed: string[];
 }
+
+// ── Module Pipeline Trace (M01 → M08 I/O Inspector) ─────────────
+export type ModuleTraceStatus = "success" | "skipped" | "error" | "not_implemented" | "pending";
+export type PipelineStatus = "success" | "partial" | "error";
+
+export interface ModuleTrace {
+  module_id: string;
+  module_name: string;
+  status: ModuleTraceStatus;
+  timestamp: string;
+  inputs: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  error?: string | null;
+  traceback?: string | null;
+  duration_ms?: number | null;
+}
+
+export interface PipelineTraceResponse {
+  pipeline_id: string;
+  started_at: string;
+  completed_at: string;
+  total_duration_ms: number;
+  status: PipelineStatus;
+  modules: ModuleTrace[];
+  summary: Record<string, unknown>;
+}
+
+export interface PipelineRunRequest {
+  raw_icp_text?: string;
+  icp_file_path?: string;
+  canonical_icp?: Record<string, unknown>;
+  run_verification?: boolean;
+  run_fit_evaluation?: boolean;
+  max_accounts_for_buyer_research?: number;
+}
+
+export const PIPELINE_MODULE_ORDER = [
+  "m01_icp_management",
+  "m02_account_discovery",
+  "m03_verification",
+  "m04_fit_evaluation",
+  "m05_buyer_identification",
+  "m06_account_understanding",
+  "m07_personalized_outreach",
+  "m08_qualification",
+] as const;
+
+export const PIPELINE_MODULE_META: Record<string, { step: string; icon: string; description: string }> = {
+  m01_icp_management: {
+    step: "01",
+    icon: "🎯",
+    description: "Parse raw ICP description into structured Canonical ICP schema.",
+  },
+  m02_account_discovery: {
+    step: "02",
+    icon: "🔍",
+    description: "Run AI web search to discover candidate accounts matching the ICP.",
+  },
+  m03_verification: {
+    step: "03",
+    icon: "✅",
+    description: "Fact-check each account against live web data for accuracy.",
+  },
+  m04_fit_evaluation: {
+    step: "04",
+    icon: "📊",
+    description: "Score each account against the ICP across weighted fit dimensions.",
+  },
+  m05_buyer_identification: {
+    step: "05",
+    icon: "👤",
+    description: "Find key decision makers and enrich with contact intelligence.",
+  },
+  m06_account_understanding: {
+    step: "06",
+    icon: "📚",
+    description: "Deep research: news, tech stack, pain points, competitors, talking points.",
+  },
+  m07_personalized_outreach: {
+    step: "07",
+    icon: "✉️",
+    description: "Generate multi-channel outreach sequences (email, LinkedIn, call script).",
+  },
+  m08_qualification: {
+    step: "08",
+    icon: "🎖️",
+    description: "MEDDPICC / BANT / SPICED qualification scorecard + deal gaps.",
+  },
+};

@@ -23,6 +23,8 @@ import type {
   Objection,
   OutcomeRecord,
   OutreachMessage,
+  PipelineRunRequest,
+  PipelineTraceResponse,
   QualificationCriterion,
 } from "./types";
 
@@ -95,4 +97,67 @@ export async function getCrmSyncStatus(): Promise<CrmSyncStatus> {
 
 export async function getOutcomeRecords(): Promise<OutcomeRecord[]> {
   return latency(mock.outcomeRecords);
+}
+
+// ── Module Pipeline Trace (Backend HTTP calls) ──────────────────────
+// These bypass the mock adapter — they call the FastAPI backend directly
+// through the Next.js proxy configured in next.config.ts (/api/* → :8000/api/*).
+
+export async function getBackendHealth(): Promise<{ status: string; modules: string[] } | null> {
+  try {
+    const res = await fetch("/api/health", { cache: "no-store" });
+    if (res.ok) return await res.json();
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export async function runPipelineTrace(req: PipelineRunRequest): Promise<PipelineTraceResponse> {
+  const res = await fetch("/api/tracer/run-pipeline", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Pipeline failed (${res.status}): ${errText}`);
+  }
+  return (await res.json()) as PipelineTraceResponse;
+}
+
+export async function runPipelineTraceUpload(params: {
+  raw_icp_text?: string;
+  icp_file?: File | null;
+  run_verification?: boolean;
+  run_fit_evaluation?: boolean;
+  max_accounts_for_buyer_research?: number;
+}): Promise<PipelineTraceResponse> {
+  const form = new FormData();
+  if (params.raw_icp_text) form.append("raw_icp_text", params.raw_icp_text);
+  if (params.icp_file) form.append("icp_file", params.icp_file);
+  if (params.run_verification !== undefined) {
+    form.append("run_verification", String(params.run_verification));
+  }
+  if (params.run_fit_evaluation !== undefined) {
+    form.append("run_fit_evaluation", String(params.run_fit_evaluation));
+  }
+  if (params.max_accounts_for_buyer_research !== undefined) {
+    form.append(
+      "max_accounts_for_buyer_research",
+      String(params.max_accounts_for_buyer_research)
+    );
+  }
+
+  const res = await fetch("/api/tracer/run-pipeline-upload", {
+    method: "POST",
+    body: form,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Pipeline failed (${res.status}): ${errText}`);
+  }
+  return (await res.json()) as PipelineTraceResponse;
 }
