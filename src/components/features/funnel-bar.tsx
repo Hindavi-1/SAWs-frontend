@@ -33,7 +33,7 @@ export function FunnelBar({ data }: { data: FunnelStageCount[] }) {
           >
             <div className="relative flex h-32 w-full items-end justify-center sm:h-36">
               <div
-                className="relative w-full max-w-[36px] min-w-[20px] overflow-hidden rounded-t-lg border border-black/5 dark:border-white/10 transition-all duration-300 group-hover:scale-[1.06] group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.25)]"
+                className="relative w-full max-w-[36px] min-w-[20px] border border-black/5 dark:border-white/10 transition-all duration-300 group-hover:scale-[1.06] group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_20px_-6px_rgba(0,0,0,0.25)]"
                 style={{
                   minHeight: "28px",
                   height: `${heightPct}%`,
@@ -48,7 +48,7 @@ export function FunnelBar({ data }: { data: FunnelStageCount[] }) {
                   }}
                 />
                 <div
-                  className="absolute left-1 top-1 bottom-1 w-1 rounded-full"
+                  className="absolute left-1 top-1 bottom-1 w-1"
                   style={{
                     background:
                       "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0))",

@@ -44,17 +44,8 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Metrics strip */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <MetricCard label="Total accounts" value={metrics.totalAccounts.toLocaleString()} icon={Building2} tone="indigo" />
-        <MetricCard label="Discovery runs active" value={metrics.activeDiscoveryRuns} icon={Sparkles} tone="violet" />
-        <MetricCard label="Qualified this week" value={metrics.qualifiedThisWeek} icon={TrendingUp} delta={{ value: "18", positive: true }} tone="emerald" />
-        <MetricCard label="Avg. time in stage" value={metrics.avgTimeInStageDays} suffix="days" icon={Clock} tone="cyan" />
-        <MetricCard label="Agent success rate" value={`${metrics.agentSuccessRate}%`} icon={CheckCircle2} tone="amber" />
-      </div>
-
       {/* Attention + Activity */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
+      <div className="mb-6 grid grid-cols-1 gap-5 lg:grid-cols-5">
         <Card className="lg:col-span-2 overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-md)]">
           <CardHeader className="bg-gradient-to-r from-transparent via-risk-50/50 to-transparent dark:via-risk-50/10">
             <div>
@@ -95,7 +86,7 @@ export default async function DashboardPage() {
 
       {/* Watchlist */}
       {watchlist.length > 0 && (
-        <Card className="mt-6 overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-md)]">
+        <Card className="mb-6 overflow-hidden transition-all duration-300 hover:shadow-[var(--shadow-md)]">
           <CardHeader className="bg-gradient-to-r from-transparent via-caution-50/40 to-transparent dark:via-caution-50/10">
             <div>
               <CardTitle className="text-[15px]">Watchlist</CardTitle>
@@ -123,6 +114,15 @@ export default async function DashboardPage() {
           </div>
         </Card>
       )}
+
+      {/* Metrics strip */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <MetricCard label="Total accounts" value={metrics.totalAccounts.toLocaleString()} icon={Building2} tone="indigo" />
+        <MetricCard label="Discovery runs active" value={metrics.activeDiscoveryRuns} icon={Sparkles} tone="violet" />
+        <MetricCard label="Qualified this week" value={metrics.qualifiedThisWeek} icon={TrendingUp} delta={{ value: "18", positive: true }} tone="emerald" />
+        <MetricCard label="Avg. time in stage" value={metrics.avgTimeInStageDays} suffix="days" icon={Clock} tone="cyan" />
+        <MetricCard label="Agent success rate" value={`${metrics.agentSuccessRate}%`} icon={CheckCircle2} tone="amber" />
+      </div>
     </div>
   );
 }
