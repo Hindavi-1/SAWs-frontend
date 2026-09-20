@@ -1,0 +1,300 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --surface-canvas: #f6f7fb;
+  --surface-raised: #ffffff;
+  --surface-sunken: #f0f2f7;
+  --surface-overlay: #ffffff;
+
+  --border-subtle: #e6e8ef;
+  --border-default: #d9dce6;
+  --border-strong: #bfc5d4;
+
+  --text-primary: #0f1220;
+  --text-secondary: #4f5668;
+  --text-tertiary: #848ba1;
+  --text-inverse: #f7f8fb;
+
+  --accent-50: #eef1fd;
+  --accent-100: #dbe1fb;
+  --accent-200: #c2cdf8;
+  --accent-300: #96a4f0;
+  --accent-400: #6b7fe6;
+  --accent-500: #4a5fdc;
+  --accent-600: #3a4fc3;
+  --accent-700: #2e3e9b;
+  --accent-contrast: #ffffff;
+
+  --signal-positive-50: #e7f8ef;
+  --signal-positive-100: #c8efd9;
+  --signal-positive-500: #14a06c;
+  --signal-positive-600: #0f8358;
+
+  --signal-caution-50: #fdf4e4;
+  --signal-caution-100: #f9e3be;
+  --signal-caution-500: #c97b11;
+  --signal-caution-600: #a86408;
+
+  --signal-risk-50: #fdecec;
+  --signal-risk-100: #f8caca;
+  --signal-risk-500: #c93a3a;
+  --signal-risk-600: #a82e2e;
+
+  --signal-progress-50: #e6f2f8;
+  --signal-progress-100: #c3e1ef;
+  --signal-progress-500: #0e7f9d;
+  --signal-progress-600: #0a6580;
+
+  --ramp-1: #98a0b8;
+  --ramp-2: #7487dd;
+  --ramp-3: #4a5fdc;
+  --ramp-4: #3e74dd;
+  --ramp-5: #0e7f9d;
+  --ramp-6: #14a06c;
+  --ramp-7: #7ab03f;
+  --ramp-8: #c97b11;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 8px -2px rgba(16, 24, 40, 0.06), 0 2px 4px -2px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 16px -4px rgba(16, 24, 40, 0.08), 0 4px 6px -2px rgba(16, 24, 40, 0.04);
+  --shadow-xl: 0 20px 24px -4px rgba(16, 24, 40, 0.10), 0 8px 8px -4px rgba(16, 24, 40, 0.04);
+  --shadow-glow-accent: 0 0 24px -4px rgba(74, 95, 220, 0.35);
+  --shadow-glow-success: 0 0 24px -4px rgba(20, 160, 108, 0.35);
+}
+
+.dark {
+  --surface-canvas: #0a0b12;
+  --surface-raised: #12141f;
+  --surface-sunken: #08090f;
+  --surface-overlay: #181b28;
+
+  --border-subtle: #1e2132;
+  --border-default: #282c42;
+  --border-strong: #3a405c;
+
+  --text-primary: #f0f2f8;
+  --text-secondary: #a3a9be;
+  --text-tertiary: #6b7289;
+  --text-inverse: #0a0b12;
+
+  --accent-50: #141938;
+  --accent-100: #1d2558;
+  --accent-200: #2c377a;
+  --accent-300: #6b7fe6;
+  --accent-400: #8a9bed;
+  --accent-500: #a3b1f2;
+  --accent-600: #bcc6f5;
+  --accent-700: #d5dbf9;
+  --accent-contrast: #0a0b12;
+
+  --signal-positive-50: #0c281d;
+  --signal-positive-100: #123a2a;
+  --signal-positive-500: #34c98f;
+  --signal-positive-600: #5ad6a5;
+
+  --signal-caution-50: #2b210c;
+  --signal-caution-100: #3e3110;
+  --signal-caution-500: #e8b04c;
+  --signal-caution-600: #f0c472;
+
+  --signal-risk-50: #2d1212;
+  --signal-risk-100: #421a1a;
+  --signal-risk-500: #ed7f7d;
+  --signal-risk-600: #f39e9c;
+
+  --signal-progress-50: #0c232c;
+  --signal-progress-100: #123744;
+  --signal-progress-500: #5bc5de;
+  --signal-progress-600: #84d5e8;
+
+  --ramp-1: #6b7289;
+  --ramp-2: #7487dd;
+  --ramp-3: #8a9bed;
+  --ramp-4: #6ba6ea;
+  --ramp-5: #5bc5de;
+  --ramp-6: #34c98f;
+  --ramp-7: #9ed65f;
+  --ramp-8: #e8b04c;
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px -2px rgba(0, 0, 0, 0.6), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 16px -4px rgba(0, 0, 0, 0.7), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 24px -4px rgba(0, 0, 0, 0.8), 0 8px 8px -4px rgba(0, 0, 0, 0.5);
+  --shadow-glow-accent: 0 0 32px -6px rgba(138, 155, 237, 0.35);
+  --shadow-glow-success: 0 0 32px -6px rgba(52, 201, 143, 0.35);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--surface-canvas);
+  --color-raised: var(--surface-raised);
+  --color-sunken: var(--surface-sunken);
+  --color-overlay: var(--surface-overlay);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-positive-50: var(--signal-positive-50);
+  --color-positive-100: var(--signal-positive-100);
+  --color-positive-500: var(--signal-positive-500);
+  --color-positive-600: var(--signal-positive-600);
+
+  --color-caution-50: var(--signal-caution-50);
+  --color-caution-100: var(--signal-caution-100);
+  --color-caution-500: var(--signal-caution-500);
+  --color-caution-600: var(--signal-caution-600);
+
+  --color-risk-50: var(--signal-risk-50);
+  --color-risk-100: var(--signal-risk-100);
+  --color-risk-500: var(--signal-risk-500);
+  --color-risk-600: var(--signal-risk-600);
+
+  --color-progress-50: var(--signal-progress-50);
+  --color-progress-100: var(--signal-progress-100);
+  --color-progress-500: var(--signal-progress-500);
+  --color-progress-600: var(--signal-progress-600);
+
+  --font-sans: var(--font-manrope);
+  --font-mono: var(--font-plex-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(at 18% 0%, rgba(74, 95, 220, 0.06) 0px, transparent 50%),
+    radial-gradient(at 82% 0%, rgba(14, 127, 157, 0.05) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(20, 160, 108, 0.04) 0px, transparent 50%);
+  opacity: 1;
+}
+
+.dark body::before {
+  background-image:
+    radial-gradient(at 18% 0%, rgba(138, 155, 237, 0.10) 0px, transparent 50%),
+    radial-gradient(at 82% 0%, rgba(91, 197, 222, 0.08) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(52, 201, 143, 0.06) 0px, transparent 50%);
+}
+
+#__next,
+main {
+  position: relative;
+  z-index: 1;
+}
+
+* {
+  border-color: var(--border-default);
+}
+
+::selection {
+  background: var(--accent-100);
+  color: var(--text-primary);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+  background-clip: content-box;
+  border: 2px solid transparent;
+}
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 95, 220, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(74, 95, 220, 0); }
+}
+
+.animate-float-soft {
+  animation: float-soft 4s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
