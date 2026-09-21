@@ -215,12 +215,12 @@ function ModuleCard({
       className={cn(
         "relative overflow-hidden rounded-2xl border border-border-subtle bg-raised shadow-[var(--shadow-sm)] transition-all",
         isImplemented &&
-          trace.status === "success" &&
-          "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-positive-500/40 before:via-positive-500 before:to-positive-500/40",
+        trace.status === "success" &&
+        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-positive-500/40 before:via-positive-500 before:to-positive-500/40",
         trace.status === "error" &&
-          "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-risk-500/40 before:via-risk-500 before:to-risk-500/40",
+        "before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-risk-500/40 before:via-risk-500 before:to-risk-500/40",
         !isImplemented &&
-          "opacity-85 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-slate-400/40 before:via-slate-400 before:to-slate-400/40"
+        "opacity-85 before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-gradient-to-r before:from-slate-400/40 before:via-slate-400 before:to-slate-400/40"
       )}
     >
       <button
@@ -319,7 +319,7 @@ function ModuleCard({
                     </span>
                   </summary>
                   <pre className="mx-3 mb-3 max-h-[360px] overflow-auto rounded-lg border border-border-subtle bg-slate-950/70 p-3 font-mono text-[11px] leading-relaxed text-slate-300 scrollbar-thin whitespace-pre">
-{trace.traceback}
+                    {trace.traceback}
                   </pre>
                 </details>
               )}
@@ -392,8 +392,8 @@ function parseRichError(raw: unknown): RichError {
           return {
             message: String(
               (detail as { error?: unknown }).error ??
-                (detail as { message?: unknown }).message ??
-                errMsg
+              (detail as { message?: unknown }).message ??
+              errMsg
             ),
             error_type: (detail as { error_type?: string | null }).error_type ?? null,
             traceback: (detail as { traceback?: string | null }).traceback ?? null,
@@ -577,7 +577,7 @@ export default function PipelineInspectorPage() {
                 Start the backend before running a pipeline:
               </p>
               <pre className="mt-3 overflow-x-auto rounded-xl border border-risk-500/20 bg-black/30 p-3 font-mono text-[11px] text-slate-300">
-{`..\\venv\\Scripts\\Activate.ps1
+                {`..\\venv\\Scripts\\Activate.ps1
 uvicorn api.main:app --reload --port 8000`}
               </pre>
             </div>
@@ -855,7 +855,7 @@ uvicorn api.main:app --reload --port 8000`}
                       </span>
                     </summary>
                     <pre className="mx-3 mb-3 max-h-[520px] overflow-auto rounded-lg border border-border-subtle bg-slate-950/70 p-3 font-mono text-[11px] leading-relaxed text-slate-300 scrollbar-thin">
-{error.traceback}
+                      {error.traceback}
                     </pre>
                   </details>
                 )}
