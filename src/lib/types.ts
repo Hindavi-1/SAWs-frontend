@@ -306,6 +306,7 @@ export interface PipelineRunRequest {
   run_verification?: boolean;
   run_fit_evaluation?: boolean;
   max_accounts_for_buyer_research?: number;
+  mode?: "live" | "mock";
 }
 
 export const PIPELINE_MODULE_ORDER = [

@@ -414,6 +414,7 @@ function parseRichError(raw: unknown): RichError {
 export default function PipelineInspectorPage() {
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
+  const [execMode, setExecMode] = useState<"live" | "mock">("mock");
   const [icpMode, setIcpMode] = useState<IcpInputMode>("text");
   const [icpText, setIcpText] = useState<string>(DEFAULT_ICP_TEXT);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -440,6 +441,7 @@ export default function PipelineInspectorPage() {
       run_verification: true,
       run_fit_evaluation: true,
       max_accounts_for_buyer_research: 3,
+      mode: execMode,
     };
 
     try {
@@ -452,6 +454,12 @@ export default function PipelineInspectorPage() {
           ...commonOpts,
         });
         setTrace(result);
+        if (result.status === "error") {
+          const erroredMod = result.modules.find((m) => m.status === "error");
+          if (erroredMod) {
+            setExpandedModule(erroredMod.module_id);
+          }
+        }
       } else {
         if (!icpText.trim()) {
           throw new Error("Please enter an ICP description first");
@@ -461,6 +469,12 @@ export default function PipelineInspectorPage() {
           ...commonOpts,
         });
         setTrace(result);
+        if (result.status === "error") {
+          const erroredMod = result.modules.find((m) => m.status === "error");
+          if (erroredMod) {
+            setExpandedModule(erroredMod.module_id);
+          }
+        }
       }
     } catch (e) {
       setError(parseRichError(e));
@@ -594,34 +608,74 @@ uvicorn api.main:app --reload --port 8000`}
             </div>
           </div>
 
-          {/* Mode Tabs */}
-          <div className="mb-4 inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-sunken/70 p-1">
-            <button
-              type="button"
-              onClick={() => setIcpMode("text")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all",
-                icpMode === "text"
-                  ? "bg-raised text-text-primary shadow-[var(--shadow-sm)]"
-                  : "text-text-tertiary hover:text-text-secondary"
-              )}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Paste ICP Description
-            </button>
-            <button
-              type="button"
-              onClick={() => setIcpMode("upload")}
-              className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all",
-                icpMode === "upload"
-                  ? "bg-raised text-text-primary shadow-[var(--shadow-sm)]"
-                  : "text-text-tertiary hover:text-text-secondary"
-              )}
-            >
-              <UploadCloud className="h-3.5 w-3.5" />
-              Upload ICP Document
-            </button>
+          {/* Controls Bar: Mode Tabs + Execution Engine Switcher */}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            {/* Input Type */}
+            <div className="inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-sunken/70 p-1">
+              <button
+                type="button"
+                onClick={() => setIcpMode("text")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all",
+                  icpMode === "text"
+                    ? "bg-raised text-text-primary shadow-[var(--shadow-sm)]"
+                    : "text-text-tertiary hover:text-text-secondary"
+                )}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                Paste ICP Description
+              </button>
+              <button
+                type="button"
+                onClick={() => setIcpMode("upload")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-all",
+                  icpMode === "upload"
+                    ? "bg-raised text-text-primary shadow-[var(--shadow-sm)]"
+                    : "text-text-tertiary hover:text-text-secondary"
+                )}
+              >
+                <UploadCloud className="h-3.5 w-3.5" />
+                Upload ICP Document
+              </button>
+            </div>
+
+            {/* Execution Engine Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-text-tertiary">
+                Engine:
+              </span>
+              <div className="inline-flex items-center gap-1 rounded-xl border border-border-subtle bg-sunken/70 p-1">
+                <button
+                  type="button"
+                  onClick={() => setExecMode("mock")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all",
+                    execMode === "mock"
+                      ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 shadow-sm"
+                      : "text-text-tertiary hover:text-text-secondary"
+                  )}
+                  title="Offline mock engine (1-2s run, no API keys needed, deterministic outputs)"
+                >
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Mock (Offline Demo)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExecMode("live")}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all",
+                    execMode === "live"
+                      ? "bg-accent-500/15 text-accent-600 dark:text-accent-400 border border-accent-500/30 shadow-sm"
+                      : "text-text-tertiary hover:text-text-secondary"
+                  )}
+                  title="Live AI execution using Groq LLM & Tavily Web Search"
+                >
+                  <span className="h-2 w-2 rounded-full bg-accent-500" />
+                  Live (Groq + Tavily)
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Text Input */}

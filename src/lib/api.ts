@@ -100,12 +100,27 @@ export async function getOutcomeRecords(): Promise<OutcomeRecord[]> {
 }
 
 // ── Module Pipeline Trace (Backend HTTP calls) ──────────────────────
-// These bypass the mock adapter — they call the FastAPI backend directly
-// through the Next.js proxy configured in next.config.ts (/api/* → :8000/api/*).
+// Calls FastAPI backend directly (http://127.0.0.1:8000) to prevent Next.js proxy socket hang ups,
+// with graceful fallback to relative /api/* if needed.
+
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" ? "http://127.0.0.1:8000" : "http://127.0.0.1:8000");
+
+async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const fullUrl = `${API_BASE}${path}`;
+  try {
+    const res = await fetch(fullUrl, options);
+    return res;
+  } catch {
+    // If direct backend call fails, try relative proxy
+    return await fetch(path, options);
+  }
+}
 
 export async function getBackendHealth(): Promise<{ status: string; modules: string[] } | null> {
   try {
-    const res = await fetch("/api/health", { cache: "no-store" });
+    const res = await apiFetch("/api/health", { cache: "no-store" });
     if (res.ok) return await res.json();
     return null;
   } catch {
@@ -114,7 +129,7 @@ export async function getBackendHealth(): Promise<{ status: string; modules: str
 }
 
 export async function runPipelineTrace(req: PipelineRunRequest): Promise<PipelineTraceResponse> {
-  const res = await fetch("/api/tracer/run-pipeline", {
+  const res = await apiFetch("/api/tracer/run-pipeline", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -133,10 +148,12 @@ export async function runPipelineTraceUpload(params: {
   run_verification?: boolean;
   run_fit_evaluation?: boolean;
   max_accounts_for_buyer_research?: number;
+  mode?: "live" | "mock";
 }): Promise<PipelineTraceResponse> {
   const form = new FormData();
   if (params.raw_icp_text) form.append("raw_icp_text", params.raw_icp_text);
   if (params.icp_file) form.append("icp_file", params.icp_file);
+  if (params.mode) form.append("mode", params.mode);
   if (params.run_verification !== undefined) {
     form.append("run_verification", String(params.run_verification));
   }
@@ -150,7 +167,7 @@ export async function runPipelineTraceUpload(params: {
     );
   }
 
-  const res = await fetch("/api/tracer/run-pipeline-upload", {
+  const res = await apiFetch("/api/tracer/run-pipeline-upload", {
     method: "POST",
     body: form,
     cache: "no-store",
@@ -161,3 +178,4 @@ export async function runPipelineTraceUpload(params: {
   }
   return (await res.json()) as PipelineTraceResponse;
 }
+
