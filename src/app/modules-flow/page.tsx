@@ -36,6 +36,9 @@ const IMPLEMENTED_MODULES = [
   "m03_verification",
   "m04_fit_evaluation",
   "m05_buyer_identification",
+  "m06_account_understanding",
+  "m07_personalized_outreach",
+  "m08_qualification",
 ];
 
 const STATUS_META: Record<
@@ -462,7 +465,7 @@ export default function PipelineInspectorPage() {
         }
       } else {
         if (!icpText.trim()) {
-          throw new Error("Please enter an ICP description first");
+          throw new Error("Please enter a product/service description first");
         }
         const result = await runPipelineTrace({
           raw_icp_text: icpText,
@@ -554,14 +557,14 @@ export default function PipelineInspectorPage() {
           <h1 className="mt-3 text-3xl font-black tracking-tight text-text-primary">
             Module Flow Inspector
             <span className="ml-3 bg-gradient-to-r from-accent-500 to-violet-500 bg-clip-text text-transparent">
-              M01 → M05
+              M01 → M08
             </span>
           </h1>
           <p className="mt-1.5 text-sm text-text-tertiary">
             End-to-end B2B lead generation pipeline — per-module{" "}
             <span className="font-semibold text-indigo-600 dark:text-indigo-400">inputs</span> and{" "}
             <span className="font-semibold text-emerald-600 dark:text-emerald-400">outputs</span>.
-            M06–M08 are marked for later implementation.
+            Complete workflow from ICP parsing to deal qualification.
           </p>
         </div>
 
@@ -592,7 +595,7 @@ uvicorn api.main:app --reload --port 8000`}
                 Choose your ICP input
               </h2>
               <p className="mt-1 text-xs text-text-tertiary">
-                Either paste an ICP description, or upload a{" "}
+                Either paste a product/service description, or upload a{" "}
                 <code className="rounded bg-black/10 px-1 font-mono text-[10px] dark:bg-white/5">
                   .docx
                 </code>
@@ -623,7 +626,7 @@ uvicorn api.main:app --reload --port 8000`}
                 )}
               >
                 <FileText className="h-3.5 w-3.5" />
-                Paste ICP Description
+                Enter Product/Service Description
               </button>
               <button
                 type="button"
@@ -784,11 +787,7 @@ uvicorn api.main:app --reload --port 8000`}
             <div className="flex flex-wrap items-center gap-3 text-[11px] text-text-tertiary">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-positive-500" />
-                M01–M05 fully executed
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-text-tertiary/50" />
-                M06–M08 shown as pending
+                M01–M08 fully executed
               </span>
             </div>
 
@@ -814,7 +813,7 @@ uvicorn api.main:app --reload --port 8000`}
               ) : (
                 <>
                   <PlayCircle className="relative h-4 w-4" />
-                  Run Pipeline M01 → M05
+                  Run Pipeline M01 → M08
                 </>
               )}
             </button>
@@ -872,15 +871,18 @@ uvicorn api.main:app --reload --port 8000`}
               Running pipeline — this can take 2–5 minutes…
             </p>
             <p className="mt-1 text-xs text-text-tertiary">
-              M01 ICP → M02 Discovery → M03 Verification → M04 Fit → M05 Buyers
+              M01 ICP → M02 Discovery → M03 Verify → M04 Fit → M05 Buyers → M06 Research → M07 Outreach → M08 Qualify
             </p>
-            <div className="mx-auto mt-6 grid max-w-3xl grid-cols-5 gap-2">
+            <div className="mx-auto mt-6 grid max-w-4xl grid-cols-4 gap-2 sm:grid-cols-8">
               {[
                 { n: "M01", label: "ICP" },
                 { n: "M02", label: "Discovery" },
                 { n: "M03", label: "Verify" },
                 { n: "M04", label: "Fit" },
                 { n: "M05", label: "Buyers" },
+                { n: "M06", label: "Research" },
+                { n: "M07", label: "Outreach" },
+                { n: "M08", label: "Qualify" },
               ].map((s, i) => (
                 <div
                   key={s.n}
@@ -957,25 +959,46 @@ uvicorn api.main:app --reload --port 8000`}
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
                 <SummaryTile
-                  label="Accounts through fit"
+                  label="Accounts passed fit"
                   value={String(
                     (trace.summary.accounts_passed_fit as number) ?? 0
                   )}
-                  sub="After verification + fit evaluation"
+                  sub="After verification + fit"
                 />
                 <SummaryTile
-                  label="Total buyers found"
+                  label="Buyers found"
                   value={String(
                     (trace.summary.total_buyers_found as number) ?? 0
                   )}
-                  sub="Across top N accounts (M05)"
+                  sub="Across top accounts (M05)"
+                />
+                <SummaryTile
+                  label="Dossiers compiled"
+                  value={String(
+                    (trace.summary.total_dossiers as number) ?? 0
+                  )}
+                  sub="Deep research (M06)"
+                />
+                <SummaryTile
+                  label="Sequences generated"
+                  value={String(
+                    (trace.summary.total_sequences as number) ?? 0
+                  )}
+                  sub="Multi-channel outreach (M07)"
+                />
+                <SummaryTile
+                  label="Deals qualified"
+                  value={String(
+                    (trace.summary.total_qualified as number) ?? 0
+                  )}
+                  sub="MEDDPICC scorecards (M08)"
                 />
                 <SummaryTile
                   label="Modules executed"
-                  value={`${stats.succeeded}/5`}
-                  sub="M01 → M05 (M06–M08 pending)"
+                  value={`${stats.succeeded}/8`}
+                  sub="M01 → M08 complete"
                 />
               </div>
 
@@ -983,10 +1006,8 @@ uvicorn api.main:app --reload --port 8000`}
                 <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-caution-500/20 bg-caution-500/8 p-3">
                   <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-caution-500" />
                   <div className="min-w-0 text-xs text-caution-700 dark:text-caution-300">
-                    <span className="font-bold">M06–M08 (Account Understanding · Personalized Outreach · Deal Qualification)</span>{" "}
-                    are present in the backend codebase with schemas & state, but their node
-                    execution graphs haven't been wired through this pipeline endpoint yet.
-                    They'll be shown in this view once added.
+                    <span className="font-bold">{stats.pending} module(s) pending</span>{" "}
+                    did not run during this pipeline execution.
                   </div>
                 </div>
               )}
