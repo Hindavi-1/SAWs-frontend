@@ -184,10 +184,249 @@ export const qualificationByAccount: Record<string, QualificationCriterion[]> = 
 
 export const outreachByAccount: Record<string, OutreachMessage[]> = {
   acc_1: [
-    { id: "om_1", accountId: "acc_1", buyerId: "b_1", channel: "email", subject: "Modernizing payment ops at Northbridge", body: "Hi Elena — noticed the team is scaling payments infra post-Series C...", status: "pending_approval" },
+    {
+      id: "om_1",
+      accountId: "acc_1",
+      buyerId: "b_1",
+      channel: "email",
+      subject: "Scaling payments infra post-Series C at Northbridge",
+      body: `Hi Elena,
+
+Noticed Northbridge recently announced a $48M Series C led by Bessemer — huge milestone, congratulations to you and the engineering team.
+
+I also saw that you're currently hiring 6 payments infrastructure engineers in Austin. Usually when fintechs scale transaction volume at this velocity while migrating off legacy ACH providers, engineering teams spend 30-40% of their sprints building manual reconciliation bridges and edge-case error handlers instead of core product.
+
+We built an agentic reconciliation and money movement platform that plugs directly into existing banking APIs, cutting payment pipeline build time from 9 months to under 3 weeks.
+
+Worth a 12-minute intro this Thursday or Friday to benchmark how peer Series C fintechs handled this exact transition?
+
+Best,
+Priya Shah
+Senior SDR | SAWFs`,
+      status: "pending_approval",
+      sequenceStep: 1,
+      sequenceTotalSteps: 4,
+      dayOffset: 0,
+      stepTitle: "Initial Outreach: Pain & Scaling Signals",
+      angleChosen: "Payments Infrastructure Scaling & Hiring Signal post-Series C raise",
+      personalizationHooks: [
+        "Raised $48M Series C led by Bessemer in June 2026",
+        "Posted 6 open roles for payments infrastructure engineers in Austin",
+        "Currently integrated with legacy ACH processor according to job descriptions",
+      ],
+      evidenceIds: ["ev_1", "ev_2", "ev_3"],
+      createdAt: hoursAgo(3),
+      buyerName: "Elena Voss",
+      buyerTitle: "VP of Engineering",
+      buyerSeniority: "VP",
+      buyerLinkedinUrl: "https://linkedin.com/in/elena-voss-example",
+      accountName: "Northbridge Financial",
+      accountDomain: "northbridgefin.com",
+      accountIndustry: "Fintech",
+      accountFitScore: 92,
+      urgency: "high",
+    },
+    {
+      id: "om_1_li",
+      accountId: "acc_1",
+      buyerId: "b_1",
+      channel: "linkedin",
+      body: `Hi Elena — saw the Bessemer Series C news and the open payments infra roles in Austin. Sent a brief note to your email regarding how peer teams automate ACH bridge reconciliation during rapid headcount scaling. Would love to connect here!`,
+      status: "draft",
+      sequenceStep: 2,
+      sequenceTotalSteps: 4,
+      dayOffset: 3,
+      stepTitle: "LinkedIn Connection Note & Soft Touch",
+      angleChosen: "Warm professional network expansion referencing email note and Series C",
+      personalizationHooks: ["Bessemer Series C announcement", "Austin engineering hiring"],
+      evidenceIds: ["ev_1", "ev_2"],
+      buyerName: "Elena Voss",
+      buyerTitle: "VP of Engineering",
+      buyerSeniority: "VP",
+      accountName: "Northbridge Financial",
+      accountDomain: "northbridgefin.com",
+      accountIndustry: "Fintech",
+      accountFitScore: 92,
+      urgency: "normal",
+    },
+    {
+      id: "om_1_em2",
+      accountId: "acc_1",
+      buyerId: "b_1",
+      channel: "email",
+      subject: "Re: Scaling payments infra post-Series C at Northbridge",
+      body: `Elena,
+
+Following up on my note from Tuesday. When Portside Capital went through their Series B payment overhaul, their engineering leads flagged manual exception handling as their #1 bottleneck.
+
+Within 45 days of deploying our agentic verification workflows, they eliminated 82% of failed transfer retries without hiring additional compliance engineers.
+
+Attaching the 2-page architecture tear-down. Do you have 10 minutes next Tuesday around 2pm CT to compare notes?`,
+      status: "draft",
+      sequenceStep: 3,
+      sequenceTotalSteps: 4,
+      dayOffset: 6,
+      stepTitle: "Follow-up: Peer Architecture Tear-Down & ROI Proof",
+      angleChosen: "Peer validation using Portside Capital case study (similar fintech profile)",
+      personalizationHooks: ["Portside Capital won deal reference", "Failed transfer retry reduction"],
+      evidenceIds: ["ev_3", "ev_4"],
+      buyerName: "Elena Voss",
+      buyerTitle: "VP of Engineering",
+      buyerSeniority: "VP",
+      accountName: "Northbridge Financial",
+      accountDomain: "northbridgefin.com",
+      accountIndustry: "Fintech",
+      accountFitScore: 92,
+      urgency: "normal",
+    },
+    {
+      id: "om_1_call",
+      accountId: "acc_1",
+      buyerId: "b_1",
+      channel: "call_script",
+      body: `CALL SCRIPT & TALKING POINTS:
+1. Opener: "Hi Elena, Priya here from SAWFs. Reaching out because I saw Northbridge's payments team expanding in Austin post-Series C."
+2. Problem Anchor: "Most VPs of Eng I speak with post-raise tell me their senior engineers get pulled into writing manual reconciliation scripts rather than core fintech product."
+3. Value Prop: "We provide automated money-movement verification that drops into your current stack in under 3 weeks."
+4. Close / Call to Action: "Are you open to having your payments lead spend 15 minutes reviewing our API docs?"
+
+VOICEMAIL BACKUP:
+"Hi Elena, Priya Shah with SAWFs. Sent a note to your inbox about how Series C fintechs scale payment pipelines without getting bogged down by legacy ACH reconciliation. Calling to see if 10 minutes next Tuesday works. My number is 512-555-0192."`,
+      status: "draft",
+      sequenceStep: 4,
+      sequenceTotalSteps: 4,
+      dayOffset: 9,
+      stepTitle: "Direct Call & Voicemail Follow-up",
+      angleChosen: "Direct executive engagement with scripted objection responses and voicemail fallback",
+      personalizationHooks: ["Series C raise", "Austin payments team expansion"],
+      evidenceIds: ["ev_1", "ev_2"],
+      buyerName: "Elena Voss",
+      buyerTitle: "VP of Engineering",
+      buyerSeniority: "VP",
+      accountName: "Northbridge Financial",
+      accountDomain: "northbridgefin.com",
+      accountIndustry: "Fintech",
+      accountFitScore: 92,
+      urgency: "normal",
+    },
+  ],
+  acc_2: [
+    {
+      id: "om_3",
+      accountId: "acc_2",
+      buyerId: "b_2_ross",
+      channel: "linkedin",
+      body: `Dr. Ross — noticed Cascade Health posted 4 HIPAA compliance roles ahead of your Q3 EHR migration. We helped regional hospital systems automate patient consent audits across migrating clinical systems. Would love to share our compliance validation framework with your IT leadership.`,
+      status: "pending_approval",
+      sequenceStep: 1,
+      sequenceTotalSteps: 3,
+      dayOffset: 0,
+      stepTitle: "LinkedIn InMail: EHR Migration & Compliance Signal",
+      angleChosen: "HIPAA compliance hiring surge and Q3 EHR platform migration announcement",
+      personalizationHooks: [
+        "4 HIPAA / compliance-focused roles posted in the last 30 days",
+        "Announced EHR platform migration targeted for Q3",
+      ],
+      evidenceIds: ["ev_5", "ev_6"],
+      createdAt: hoursAgo(5),
+      buyerName: "Dr. Aaron Ross",
+      buyerTitle: "Chief Information Officer",
+      buyerSeniority: "C-Level",
+      accountName: "Cascade Health Systems",
+      accountDomain: "cascadehealthsys.com",
+      accountIndustry: "Healthcare IT",
+      accountFitScore: 87,
+      urgency: "normal",
+    },
+    {
+      id: "om_4",
+      accountId: "acc_2",
+      buyerId: "b_2_ross",
+      channel: "email",
+      subject: "EHR migration consent audit checklist for Cascade Health",
+      body: `Dr. Ross,
+
+Following up on my LinkedIn note. With Cascade's Q3 EHR migration approaching and your team actively staffing 4 compliance roles, audit readiness is likely top of mind.
+
+We provide an automated data validation layer that pre-scans clinical data pipelines for HIPAA consent gaps before cutover, eliminating regulatory audit flags.
+
+Could we schedule a 15-minute executive briefing with your health informatics team next week?`,
+      status: "draft",
+      sequenceStep: 2,
+      sequenceTotalSteps: 3,
+      dayOffset: 4,
+      stepTitle: "Email Follow-up: Regulatory Audit Readiness",
+      angleChosen: "Deep EHR compliance risk mitigation",
+      personalizationHooks: ["EHR migration Q3", "4 HIPAA compliance roles"],
+      evidenceIds: ["ev_5", "ev_6"],
+      buyerName: "Dr. Aaron Ross",
+      buyerTitle: "Chief Information Officer",
+      buyerSeniority: "C-Level",
+      accountName: "Cascade Health Systems",
+      accountDomain: "cascadehealthsys.com",
+      accountIndustry: "Healthcare IT",
+      accountFitScore: 87,
+      urgency: "normal",
+    },
+  ],
+  acc_4: [
+    {
+      id: "om_6",
+      accountId: "acc_4",
+      buyerId: "b_4_vance",
+      channel: "email",
+      subject: "Ramping EMEA revenue operations at Lumen & Co.",
+      body: `Hi Marcus,
+
+Congrats on taking the CRO helm at Lumen & Co. 6 weeks ago! Seeing 38% YoY headcount growth across Dublin and London is impressive momentum.
+
+New revenue leaders often encounter a drop in rep pipeline consistency during international territory expansion. Our AI agent workflows qualify inbound mid-market demand and draft personalized outreach sequences automatically, cutting SDR onboarding time in half.
+
+Open to seeing how high-growth SaaS teams in Dublin maintain rep productivity during executive transitions?`,
+      status: "pending_approval",
+      sequenceStep: 1,
+      sequenceTotalSteps: 2,
+      dayOffset: 0,
+      stepTitle: "Initial Email: Leadership Change & Rapid EMEA Expansion",
+      angleChosen: "New CRO appointment and 38% YoY headcount expansion in Dublin",
+      personalizationHooks: [
+        "New CRO hired 6 weeks ago",
+        "38% YoY headcount growth in Dublin/London",
+      ],
+      createdAt: hoursAgo(6),
+      buyerName: "Marcus Vance",
+      buyerTitle: "Chief Revenue Officer",
+      buyerSeniority: "C-Level",
+      accountName: "Lumen & Co.",
+      accountDomain: "lumenandco.com",
+      accountIndustry: "SaaS",
+      accountFitScore: 81,
+      urgency: "normal",
+    },
   ],
   acc_5: [
-    { id: "om_2", accountId: "acc_5", buyerId: "b_4", channel: "email", subject: "Re: supplier payment modernization", body: "Tom, great speaking earlier — sending over the case study we discussed...", status: "sent", sentAt: daysAgo(2), sentiment: "positive" },
+    {
+      id: "om_2",
+      accountId: "acc_5",
+      buyerId: "b_4",
+      channel: "email",
+      subject: "Re: supplier payment modernization",
+      body: "Tom, great speaking earlier — sending over the case study we discussed regarding automated supplier reconciliations...",
+      status: "sent",
+      sentAt: daysAgo(2),
+      sentiment: "positive",
+      sequenceStep: 1,
+      sequenceTotalSteps: 3,
+      dayOffset: 0,
+      stepTitle: "Introductory Meeting Follow-up",
+      buyerName: "Tom Reilly",
+      buyerTitle: "VP Procurement",
+      buyerSeniority: "VP",
+      accountName: "Ferro Industrial",
+      accountDomain: "ferroindustrial.com",
+      accountIndustry: "Manufacturing",
+      accountFitScore: 79,
+    },
   ],
 };
 

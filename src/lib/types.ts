@@ -156,6 +156,24 @@ export interface QualificationCriterion {
   evidenceIds: string[];
 }
 
+export type OutreachStatus =
+  | "draft"
+  | "pending_approval"
+  | "approved"
+  | "rejected"
+  | "sent"
+  | "replied"
+  | "bounced";
+
+export interface OutreachSequenceStep {
+  stepNumber: number;
+  dayOffset: number;
+  channel: "email" | "linkedin" | "call_script";
+  title: string;
+  status: OutreachStatus;
+  messageId?: string;
+}
+
 export interface OutreachMessage {
   id: string;
   accountId: string;
@@ -163,9 +181,31 @@ export interface OutreachMessage {
   channel: "email" | "linkedin" | "call_script";
   subject?: string;
   body: string;
-  status: "draft" | "pending_approval" | "sent" | "replied" | "bounced";
+  status: OutreachStatus;
   sentAt?: string;
   sentiment?: "positive" | "neutral" | "negative";
+  // Sequence Context
+  sequenceStep?: number;
+  sequenceTotalSteps?: number;
+  dayOffset?: number;
+  stepTitle?: string;
+  // Agent rationale & context
+  angleChosen?: string;
+  personalizationHooks?: string[];
+  evidenceIds?: string[];
+  rejectionReason?: string;
+  lastEditedAt?: string;
+  createdAt?: string;
+  // Denormalized fields for review queue scannability
+  buyerName?: string;
+  buyerTitle?: string;
+  buyerSeniority?: string;
+  buyerLinkedinUrl?: string;
+  accountName?: string;
+  accountDomain?: string;
+  accountIndustry?: string;
+  accountFitScore?: number;
+  urgency?: "normal" | "high";
 }
 
 export interface Objection {

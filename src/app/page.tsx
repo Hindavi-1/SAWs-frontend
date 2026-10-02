@@ -1,13 +1,23 @@
-import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FunnelBar } from "@/components/features/funnel-bar";
 import { MetricCard } from "@/components/features/metric-card";
 import { AgentActivityFeed } from "@/components/features/agent-activity-feed";
 import { ApprovalCard } from "@/components/features/approval-card";
 import { RadialScore } from "@/components/ui/radial-score";
-import { StageBadge } from "@/components/ui/badge";
+import { StageBadge, HealthBadge } from "@/components/ui/badge";
 import { getAccounts, getAgentTasks, getApprovalQueue, getDashboardMetrics } from "@/lib/api";
-import { Building2, CheckCircle2, Clock, Sparkles, TrendingUp, Eye } from "lucide-react";
+import {
+  Building2,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+  TrendingUp,
+  Send,
+  ArrowRight,
+  AlertCircle,
+  MailCheck,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -18,28 +28,109 @@ export default async function DashboardPage() {
     getAccounts(),
   ]);
 
-  const watchlist = accounts.filter((a) => a.tags.includes("hot") || a.tags.includes("warm-signal") || a.tags.includes("engaged"));
+  const pendingDrafts = approvals.filter((a) => a.kind === "outreach_email");
+  const atRiskAccounts = accounts.filter((a) => a.health === "stalled" || a.daysInStage >= 10).slice(0, 4);
+  const hotAccounts = accounts.filter((a) => a.tags.includes("hot") || a.tags.includes("warm-signal")).slice(0, 6);
+  const runningTasks = tasks.filter((t) => t.status === "running").length;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Command Center"
-        title="Dashboard"
-        description="Everything moving through the funnel, what needs you, and what the agents are doing right now."
-      />
 
-      {/* Funnel health */}
-      <Card className="overflow-hidden animate-fade-in-up stagger-1">
-        <CardHeader className="relative bg-gradient-to-r from-transparent via-accent-50/40 to-transparent dark:via-accent-50/10 overflow-hidden">
-          <div className="pointer-events-none absolute -top-24 right-0 h-56 w-56 rounded-full bg-gradient-to-br from-accent-500/15 via-violet-500/10 to-transparent blur-3xl" />
+      {/* ── TODAY STRIP ─────────────────────────────────────────────────── */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-4 w-4 text-accent-500" />
-              Funnel health
-            </CardTitle>
-            <CardDescription>Accounts by stage — click a stage to filter the account list</CardDescription>
+            <h1 className="text-lg font-bold tracking-tight text-text-primary">Good morning, Rep</h1>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              &nbsp;·&nbsp;Agents have been working overnight
+            </p>
           </div>
-          <div className="hidden items-center gap-1.5 rounded-full border border-positive-500/20 bg-gradient-to-r from-positive-50 to-emerald-50 px-2.5 py-1 text-[11px] font-bold text-positive-600 sm:flex dark:from-positive-500/15 dark:to-emerald-500/10 dark:text-positive-500">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-agent-core bg-agent-surface border border-agent-border rounded-full px-3 py-1.5">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-agent-core opacity-60" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-agent-core" />
+            </span>
+            {runningTasks} agents active
+          </div>
+        </div>
+
+        {/* Today callout cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Drafts to review */}
+          <Link href="/outreach-review" className="group">
+            <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-agent-border bg-agent-surface/40 p-4 hover:bg-agent-surface/60 hover:border-agent-core/40 transition-all cursor-pointer">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-[var(--radius-sm)] bg-agent-surface border border-agent-border">
+                  <Send className="h-4 w-4 text-agent-core" />
+                </div>
+                <span className="font-mono text-2xl font-bold text-text-primary">{pendingDrafts.length}</span>
+              </div>
+              <p className="text-sm font-semibold text-text-primary group-hover:text-agent-core transition-colors">Outreach drafts to review</p>
+              <p className="text-xs text-text-tertiary mt-0.5">Agent-authored, waiting your approval</p>
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-agent-core">
+                Review in workspace <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          {/* Accounts needing attention */}
+          <Link href="/accounts?stage=stalled" className="group">
+            <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-caution-500/25 bg-caution-50/30 dark:bg-caution-950/10 p-4 hover:border-caution-500/50 transition-all cursor-pointer">
+              <div className="flex items-start justify-between mb-3">
+                <div className="p-2 rounded-[var(--radius-sm)] bg-caution-50 dark:bg-caution-950/30 border border-caution-200/50 dark:border-caution-800/30">
+                  <AlertCircle className="h-4 w-4 text-caution-500" />
+                </div>
+                <span className="font-mono text-2xl font-bold text-text-primary">{atRiskAccounts.length}</span>
+              </div>
+              <p className="text-sm font-semibold text-text-primary group-hover:text-caution-600 dark:group-hover:text-caution-400 transition-colors">Accounts need attention</p>
+              <p className="text-xs text-text-tertiary mt-0.5">At-risk or stalled 10+ days in stage</p>
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-caution-600 dark:text-caution-400">
+                View accounts <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </Link>
+
+          {/* Agent success */}
+          <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-positive-500/25 bg-positive-50/30 dark:bg-positive-950/10 p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="p-2 rounded-[var(--radius-sm)] bg-positive-50 dark:bg-positive-950/30 border border-positive-200/50 dark:border-positive-800/30">
+                <MailCheck className="h-4 w-4 text-positive-500" />
+              </div>
+              <span className="font-mono text-2xl font-bold text-text-primary">{metrics.agentSuccessRate}%</span>
+            </div>
+            <p className="text-sm font-semibold text-text-primary">Agent success rate</p>
+            <p className="text-xs text-text-tertiary mt-0.5">{metrics.qualifiedThisWeek} accounts qualified this week</p>
+            <div className="mt-3 h-1 w-full bg-sunken rounded-full overflow-hidden">
+              <div
+                className="h-full bg-positive-500 rounded-full"
+                style={{ width: `${metrics.agentSuccessRate}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── KPI STRIP ───────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        <MetricCard label="Total accounts" value={metrics.totalAccounts.toLocaleString()} icon={Building2} tone="indigo" accentPct={Math.min(92, (metrics.totalAccounts / 5000) * 100)} />
+        <MetricCard label="Active discovery" value={metrics.activeDiscoveryRuns} icon={Sparkles} tone="violet" accentPct={84} />
+        <MetricCard label="Qualified / week" value={metrics.qualifiedThisWeek} icon={TrendingUp} delta={{ value: "18", positive: true }} tone="emerald" accentPct={72} />
+        <MetricCard label="Avg. days in stage" value={metrics.avgTimeInStageDays} suffix="days" icon={Clock} tone="cyan" accentPct={60} />
+        <MetricCard label="Agent success" value={`${metrics.agentSuccessRate}%`} icon={CheckCircle2} tone="amber" accentPct={metrics.agentSuccessRate} />
+      </div>
+
+      {/* ── FUNNEL ──────────────────────────────────────────────────────── */}
+      <Card className="overflow-hidden border-border-default">
+        <CardHeader>
+          <div>
+            <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+              <Zap className="h-4 w-4 text-accent-500" />
+              Funnel Velocity
+            </CardTitle>
+            <CardDescription>Accounts by stage — click a stage to filter</CardDescription>
+          </div>
+          <div className="flex items-center gap-1.5 rounded-full border border-positive-500/20 bg-positive-50/60 dark:bg-positive-950/20 px-2.5 py-1 text-[11px] font-semibold text-positive-600 dark:text-positive-400">
             <span className="relative h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-positive-500 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-positive-500" />
@@ -47,45 +138,54 @@ export default async function DashboardPage() {
             Live
           </div>
         </CardHeader>
-        <CardContent className="pt-5">
+        <CardContent className="pt-4">
           <FunnelBar data={metrics.funnel} />
         </CardContent>
       </Card>
 
-      {/* Attention + Activity */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5 animate-fade-in-up stagger-2">
-        <Card className="lg:col-span-2 overflow-hidden">
-          <CardHeader className="relative bg-gradient-to-r from-transparent via-risk-50/50 to-transparent dark:via-risk-50/10 overflow-hidden">
-            <div className="pointer-events-none absolute -top-20 -right-10 h-56 w-56 rounded-full bg-gradient-to-br from-risk-500/14 via-rose-500/8 to-transparent blur-3xl" />
+      {/* ── ATTENTION + ACTIVITY ─────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* Left: approvals */}
+        <Card className="lg:col-span-2 overflow-hidden border-border-default">
+          <CardHeader>
             <div>
-              <CardTitle>Needs your attention</CardTitle>
-              <CardDescription>{approvals.length} items pending a decision</CardDescription>
+              <CardTitle className="text-sm font-semibold">Needs your review</CardTitle>
+              <CardDescription>{approvals.length} decisions waiting</CardDescription>
             </div>
-            <Link href="/actions" className="group inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-raised px-2.5 py-1.5 text-xs font-bold text-accent-500 transition-all hover:border-accent-500/30 hover:bg-accent-50 hover:shadow-[var(--shadow-glow-accent)] dark:hover:bg-accent-500/20">
-              View all
-              <svg className="h-3 w-3 transition-transform group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </Link>
+            <div className="flex items-center gap-1.5">
+              <Link
+                href="/outreach-review"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-agent-border bg-agent-surface px-2 py-1 text-xs font-semibold text-agent-core hover:bg-agent-surface/80 transition-colors"
+              >
+                <Send className="h-3 w-3" />
+                Review Outreach
+              </Link>
+              <Link
+                href="/actions"
+                className="inline-flex items-center gap-1 rounded-[var(--radius-sm)] border border-border-default bg-raised px-2 py-1 text-xs font-semibold text-text-secondary hover:bg-sunken hover:text-text-primary transition-colors"
+              >
+                All Actions
+              </Link>
+            </div>
           </CardHeader>
           <div className="divide-y divide-border-subtle">
-            {approvals.slice(0, 4).map((item, idx) => (
-              <div key={item.id} className="animate-fade-in-up" style={{ animationDelay: `${idx * 60 + 60}ms` }}>
-                <ApprovalCard item={item} />
-              </div>
+            {approvals.slice(0, 4).map((item) => (
+              <ApprovalCard key={item.id} item={item} />
             ))}
           </div>
         </Card>
 
-        <Card id="agent-activity" className="lg:col-span-3 overflow-hidden">
-          <CardHeader className="relative bg-gradient-to-r from-transparent via-progress-50/50 to-transparent dark:via-progress-50/10 overflow-hidden">
-            <div className="pointer-events-none absolute -top-20 -right-10 h-56 w-56 rounded-full bg-gradient-to-br from-progress-500/14 via-cyan-500/8 to-transparent blur-3xl" />
+        {/* Right: agent activity feed */}
+        <Card id="agent-activity" className="lg:col-span-3 overflow-hidden border-border-default">
+          <CardHeader>
             <div>
-              <CardTitle>Agent activity</CardTitle>
-              <CardDescription>Live and recent runs across all modules</CardDescription>
+              <CardTitle className="text-sm font-semibold">Agent Activity</CardTitle>
+              <CardDescription>Live and recent module runs</CardDescription>
             </div>
-            <div className="flex items-center gap-1.5 rounded-full border border-progress-500/25 bg-gradient-to-r from-progress-50 to-cyan-400/5 px-2.5 py-1 text-[11px] font-bold text-progress-600 dark:from-progress-500/20 dark:via-progress-500/10 dark:to-progress-500/20 dark:text-progress-400">
+            <div className="flex items-center gap-1.5 rounded-full border border-agent-border bg-agent-surface px-2.5 py-1 text-[11px] font-semibold text-agent-core">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-progress-500 opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-progress-500 animate-pulse-glow" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-agent-core opacity-60" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-agent-core" />
               </span>
               Running
             </div>
@@ -96,53 +196,44 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Watchlist */}
-      {watchlist.length > 0 && (
-        <Card className="overflow-hidden animate-fade-in-up stagger-3">
-          <CardHeader className="relative bg-gradient-to-r from-transparent via-caution-50/40 to-transparent dark:via-caution-50/10 overflow-hidden">
-            <div className="pointer-events-none absolute -top-20 right-1/4 h-56 w-56 rounded-full bg-gradient-to-br from-caution-500/14 via-amber-500/8 to-transparent blur-3xl" />
+      {/* ── WATCHLIST ────────────────────────────────────────────────────── */}
+      {hotAccounts.length > 0 && (
+        <Card className="overflow-hidden border-border-default">
+          <CardHeader>
             <div>
-              <CardTitle>Watchlist</CardTitle>
-              <CardDescription>Priority accounts to keep an eye on</CardDescription>
+              <CardTitle className="text-sm font-semibold">Hot Accounts</CardTitle>
+              <CardDescription>Active buying signals detected</CardDescription>
             </div>
-            <div className="flex items-center gap-1 rounded-md border border-border-subtle bg-raised px-2 py-0.5 text-[10px] font-bold text-text-tertiary">
-              <span className="h-1.5 w-1.5 rounded-full bg-caution-500" />
-              {watchlist.length} accounts
-            </div>
+            <Link
+              href="/accounts"
+              className="text-xs text-text-tertiary hover:text-text-secondary font-medium flex items-center gap-1"
+            >
+              View all <ArrowRight className="h-3 w-3" />
+            </Link>
           </CardHeader>
-          <div className="flex gap-3 overflow-x-auto px-5 py-4 scrollbar-thin">
-            {watchlist.map((a, i) => (
+          <div className="flex gap-3 overflow-x-auto px-5 pb-5 pt-1">
+            {hotAccounts.map((a) => (
               <Link
                 key={a.id}
                 href={`/accounts/${a.id}`}
-                className="group flex w-64 shrink-0 items-center gap-3 rounded-xl border border-border-subtle bg-gradient-to-br from-raised to-sunken/50 p-3.5 transition-all duration-300 hover:-translate-y-1 hover:border-accent-500/40 hover:shadow-[var(--shadow-md),var(--shadow-glow-accent)] animate-fade-in-up"
-                style={{ animationDelay: `${240 + i * 55}ms` }}
+                className="group flex w-56 shrink-0 items-center gap-3 rounded-[var(--radius-md)] border border-border-subtle bg-raised p-3 hover:border-border-strong hover:bg-sunken/40 transition-colors"
               >
-                <div className="relative">
-                  <span className="pointer-events-none absolute -inset-1 rounded-full bg-accent-500/15 blur-md opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  <div className="relative">
-                    <RadialScore value={a.fitScore} size={44} strokeWidth={4} />
-                  </div>
+                <div className="shrink-0">
+                  <RadialScore value={a.fitScore} size={40} strokeWidth={3.5} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-text-primary transition-colors group-hover:text-accent-500">{a.name}</p>
-                  <div className="mt-1.5"><StageBadge stage={a.stage} /></div>
+                  <p className="truncate text-xs font-semibold text-text-primary group-hover:text-accent-500 transition-colors">{a.name}</p>
+                  <p className="text-[11px] text-text-tertiary truncate mt-0.5">{a.industry}</p>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <StageBadge stage={a.stage} />
+                    <HealthBadge health={a.health} />
+                  </div>
                 </div>
-                <svg className="h-4 w-4 shrink-0 text-text-tertiary transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-accent-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </Link>
             ))}
           </div>
         </Card>
       )}
-
-      {/* Metrics strip */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 animate-fade-in-up stagger-4">
-        <MetricCard label="Total accounts" value={metrics.totalAccounts.toLocaleString()} icon={Building2} tone="indigo" accentPct={Math.min(92, (metrics.totalAccounts / 5000) * 100)} />
-        <MetricCard label="Discovery runs active" value={metrics.activeDiscoveryRuns} icon={Sparkles} tone="violet" accentPct={84} />
-        <MetricCard label="Qualified this week" value={metrics.qualifiedThisWeek} icon={TrendingUp} delta={{ value: "18", positive: true }} tone="emerald" accentPct={72} />
-        <MetricCard label="Avg. time in stage" value={metrics.avgTimeInStageDays} suffix="days" icon={Clock} tone="cyan" accentPct={60} />
-        <MetricCard label="Agent success rate" value={`${metrics.agentSuccessRate}%`} icon={CheckCircle2} tone="amber" accentPct={metrics.agentSuccessRate} />
-      </div>
     </div>
   );
 }

@@ -12,13 +12,14 @@ const OPTIONS = [
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = React.useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   return (
-    <div className="relative flex items-center gap-0.5 rounded-2xl border border-border-default bg-sunken/80 p-1 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)] backdrop-blur-sm">
+    <div className="relative flex items-center gap-0.5 rounded-[var(--radius-sm)] border border-border-default bg-sunken p-0.5">
       {OPTIONS.map((opt) => {
         const Icon = opt.icon;
         const active = mounted && theme === opt.value;
@@ -29,16 +30,13 @@ export function ThemeToggle() {
             title={opt.label}
             aria-label={opt.label}
             className={cn(
-              "relative flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
+              "flex h-6 w-6 items-center justify-center rounded-[4px] transition-colors",
               active
-                ? "bg-raised text-accent-500 shadow-[0_1px_3px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.04)] ring-1 ring-border-subtle"
-                : "text-text-tertiary hover:text-text-secondary hover:bg-raised/60"
+                ? "bg-raised text-text-primary shadow-[var(--shadow-xs)]"
+                : "text-text-tertiary hover:text-text-secondary"
             )}
           >
-            <Icon className={cn("h-4 w-4 transition-transform duration-300", active && "scale-110")} />
-            {active && (
-              <span className="pointer-events-none absolute inset-x-1.5 -bottom-0.5 h-0.5 rounded-full bg-gradient-to-r from-accent-500 to-violet-500" />
-            )}
+            <Icon className="h-3.5 w-3.5" />
           </button>
         );
       })}

@@ -67,6 +67,57 @@ export async function getOutreachForAccount(accountId: string): Promise<Outreach
   return latency(mock.outreachByAccount[accountId] ?? []);
 }
 
+export async function getAllOutreachMessages(): Promise<OutreachMessage[]> {
+  const all = Object.values(mock.outreachByAccount).flat();
+  return latency(all);
+}
+
+export async function getPendingOutreachDrafts(): Promise<OutreachMessage[]> {
+  const all = Object.values(mock.outreachByAccount).flat();
+  return latency(all.filter((m) => m.status === "pending_approval"));
+}
+
+export async function updateOutreachDraft(
+  id: string,
+  updates: Partial<OutreachMessage>
+): Promise<OutreachMessage | undefined> {
+  for (const accountId in mock.outreachByAccount) {
+    const list = mock.outreachByAccount[accountId];
+    const index = list.findIndex((m) => m.id === id);
+    if (index !== -1) {
+      mock.outreachByAccount[accountId][index] = {
+        ...list[index],
+        ...updates,
+        lastEditedAt: new Date().toISOString(),
+      };
+      return latency(mock.outreachByAccount[accountId][index]);
+    }
+  }
+  return latency(undefined);
+}
+
+export async function approveOutreachDraft(
+  id: string,
+  editedBody?: string,
+  editedSubject?: string
+): Promise<OutreachMessage | undefined> {
+  return updateOutreachDraft(id, {
+    status: "approved",
+    ...(editedBody !== undefined ? { body: editedBody } : {}),
+    ...(editedSubject !== undefined ? { subject: editedSubject } : {}),
+  });
+}
+
+export async function rejectOutreachDraft(
+  id: string,
+  reason: string
+): Promise<OutreachMessage | undefined> {
+  return updateOutreachDraft(id, {
+    status: "rejected",
+    rejectionReason: reason,
+  });
+}
+
 export async function getObjectionsForAccount(accountId: string): Promise<Objection[]> {
   return latency(mock.objectionsByAccount[accountId] ?? []);
 }
