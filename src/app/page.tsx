@@ -5,7 +5,7 @@ import { AgentActivityFeed } from "@/components/features/agent-activity-feed";
 import { ApprovalCard } from "@/components/features/approval-card";
 import { RadialScore } from "@/components/ui/radial-score";
 import { StageBadge, HealthBadge } from "@/components/ui/badge";
-import { getAccounts, getAgentTasks, getApprovalQueue, getDashboardMetrics } from "@/lib/api";
+import { getAccounts, getAgentTasks, getApprovalQueue, getDashboardMetrics, getProducts } from "@/lib/api";
 import {
   Building2,
   CheckCircle2,
@@ -17,17 +17,20 @@ import {
   AlertCircle,
   MailCheck,
   Zap,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 
 export default async function DashboardPage() {
-  const [metrics, approvals, tasks, accounts] = await Promise.all([
+  const [metrics, approvals, tasks, accounts, productsData] = await Promise.all([
     getDashboardMetrics(),
     getApprovalQueue(),
     getAgentTasks(),
     getAccounts(),
+    getProducts(),
   ]);
 
+  const activeProduct = productsData.products.find((p) => p.isSelected) || productsData.products[0];
   const pendingDrafts = approvals.filter((a) => a.kind === "outreach_email");
   const atRiskAccounts = accounts.filter((a) => a.health === "stalled" || a.daysInStage >= 10).slice(0, 4);
   const hotAccounts = accounts.filter((a) => a.tags.includes("hot") || a.tags.includes("warm-signal")).slice(0, 6);
@@ -38,15 +41,24 @@ export default async function DashboardPage() {
 
       {/* ── TODAY STRIP ─────────────────────────────────────────────────── */}
       <div>
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-text-primary">Good morning, Rep</h1>
-            <p className="text-xs text-text-tertiary mt-0.5">
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-              &nbsp;·&nbsp;Agents have been working overnight
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-xs text-text-tertiary">
+              <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+              <span>·</span>
+              <span>Active Product:</span>
+              <Link
+                href="/settings/products"
+                className="inline-flex items-center gap-1 rounded bg-accent-50/80 dark:bg-accent-500/10 px-1.5 py-0.5 text-[11px] font-semibold text-accent-600 dark:text-accent-400 hover:underline border border-accent-500/20"
+                title="Manage product offerings"
+              >
+                <Package className="h-3 w-3" />
+                <span>{activeProduct?.name || "ZeroTrust Cloud SASE Platform"}</span>
+              </Link>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-xs font-medium text-agent-core bg-agent-surface border border-agent-border rounded-full px-3 py-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-agent-core bg-agent-surface border border-agent-border rounded-full px-3 py-1.5 self-start sm:self-auto">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-agent-core opacity-60" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-agent-core" />

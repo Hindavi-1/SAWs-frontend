@@ -15,6 +15,7 @@ import {
   Target,
   ChevronsLeft,
   ChevronsRight,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,6 +42,7 @@ const PIPELINE_NAV: NavItem[] = [
 ];
 
 const PLATFORM_NAV: NavItem[] = [
+  { href: "/settings/products", label: "Products & ICPs", icon: Package },
   { href: "/intelligence", label: "Sales Intelligence", icon: LineChart },
   { href: "/icp-outcomes", label: "ICP & Outcomes", icon: Target },
   { href: "/compliance", label: "Compliance & Quality", icon: ShieldCheck },

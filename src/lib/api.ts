@@ -26,6 +26,12 @@ import type {
   PipelineRunRequest,
   PipelineTraceResponse,
   QualificationCriterion,
+  Product,
+  Company,
+  ICPRecord,
+  CreateProductInput,
+  GenerateICPInput,
+  SaveICPInput,
 } from "./types";
 
 const latency = <T,>(value: T, ms = 0): Promise<T> =>
@@ -229,4 +235,332 @@ export async function runPipelineTraceUpload(params: {
   }
   return (await res.json()) as PipelineTraceResponse;
 }
+
+// ── Multi-Tenancy Products & ICPs API ───────────────────────────────
+
+const LOCAL_STORAGE_KEY_PRODUCTS = "sawf_custom_products";
+const LOCAL_STORAGE_KEY_ACTIVE_PRODUCT = "sawf_active_product_id";
+
+function getLocalStoredProducts(): Product[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_PRODUCTS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalStoredProduct(product: Product) {
+  if (typeof window === "undefined") return;
+  try {
+    const existing = getLocalStoredProducts();
+    const updated = [product, ...existing.filter((p) => p.id !== product.id)];
+    localStorage.setItem(LOCAL_STORAGE_KEY_PRODUCTS, JSON.stringify(updated));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export async function getProducts(companyId?: string): Promise<{
+  company: Company;
+  activeProductId: string | null;
+  products: Product[];
+}> {
+  try {
+    const res = await apiFetch(`/api/products?company_id=${companyId || mock.mockCompany.id}`, {
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        company: data.company,
+        activeProductId: data.active_product_id,
+        products: data.products.map((p: any) => ({
+          id: p.id,
+          companyId: p.company_id,
+          name: p.name,
+          description: p.description,
+          targetMarket: p.target_market,
+          valueProposition: p.value_proposition,
+          isActive: p.is_active,
+          isSelected: p.is_selected,
+          icpCount: p.icp_count,
+          createdAt: p.created_at,
+          updatedAt: p.updated_at,
+        })),
+      };
+    }
+  } catch {
+    // Fall back to mock and local storage
+  }
+
+  const custom = getLocalStoredProducts();
+  const allProducts = [...custom, ...mock.mockProducts];
+  let activeId: string | null = mock.mockCompany.activeProductId;
+  if (typeof window !== "undefined") {
+    const localActive = localStorage.getItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT);
+    if (localActive) activeId = localActive;
+  }
+
+  const mapped = allProducts.map((p) => ({
+    ...p,
+    isSelected: p.id === activeId,
+  }));
+
+  return latency({
+    company: { ...mock.mockCompany, activeProductId: activeId },
+    activeProductId: activeId,
+    products: mapped,
+  });
+}
+
+export async function createProduct(payload: CreateProductInput): Promise<Product> {
+  try {
+    const res = await apiFetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company_id: payload.companyId || mock.mockCompany.id,
+        name: payload.name,
+        description: payload.description,
+        target_market: payload.targetMarket || "",
+        value_proposition: payload.valueProposition || "",
+        set_as_active: payload.setAsActive ?? true,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const p = data.product;
+      const created: Product = {
+        id: p.id,
+        companyId: p.company_id,
+        name: p.name,
+        description: p.description,
+        targetMarket: p.target_market,
+        valueProposition: p.value_proposition,
+        isActive: p.is_active,
+        isSelected: payload.setAsActive ?? true,
+        icpCount: 0,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      };
+      if (typeof window !== "undefined" && (payload.setAsActive ?? true)) {
+        localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, created.id);
+      }
+      return created;
+    }
+  } catch {
+    // Fallback to local simulation
+  }
+
+  const id = "prod_" + Date.now();
+  const newProduct: Product = {
+    id,
+    companyId: payload.companyId || mock.mockCompany.id,
+    name: payload.name,
+    description: payload.description,
+    targetMarket: payload.targetMarket,
+    valueProposition: payload.valueProposition,
+    isActive: true,
+    isSelected: payload.setAsActive ?? true,
+    icpCount: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveLocalStoredProduct(newProduct);
+  if (typeof window !== "undefined" && (payload.setAsActive ?? true)) {
+    localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, id);
+  }
+
+  return latency(newProduct, 200);
+}
+
+export async function selectActiveProduct(productId: string, companyId?: string): Promise<boolean> {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, productId);
+  }
+
+  try {
+    const res = await apiFetch(`/api/products/${productId}/select`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_id: companyId || mock.mockCompany.id }),
+    });
+    if (res.ok) return true;
+  } catch {
+    // Handled by localStorage fallback
+  }
+
+  return latency(true, 100);
+}
+
+export async function generateICPFromProduct(payload: GenerateICPInput): Promise<any> {
+  try {
+    const res = await apiFetch("/api/icp/generate-from-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_name: payload.productName,
+        product_description: payload.productDescription,
+        target_market: payload.targetMarket || "",
+        value_proposition: payload.valueProposition || "",
+        company_name: payload.companyName || "Our Company",
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.canonical_icp;
+    }
+  } catch {
+    // Fallback
+  }
+
+  // Fallback high-fidelity ICP generated from product description
+  return latency({
+    icpName: `${payload.productName} — Enterprise Target Segment`,
+    description: `Targeting organizations actively expanding their software operations that face pain points solvable by ${payload.productName}.`,
+    companyProfile: {
+      industries: ["B2B Software", "Financial Technology", "Enterprise IT", "Digital Health"],
+      subIndustries: ["Cloud Infrastructure", "Cybersecurity", "DevSecOps"],
+      employeeRange: { min: 100, max: 2500 },
+      revenueRange: { min: 15, max: 250, currency: "USD" },
+      companyStages: ["Series B", "Series C", "Growth"],
+      businessModels: ["B2B SaaS", "Hybrid Cloud Enterprise"],
+    },
+    geography: {
+      countries: ["United States", "Canada", "United Kingdom"],
+      regionsCities: ["San Francisco Bay Area", "New York", "London", "Austin"],
+    },
+    technology: {
+      required: ["Cloud Provider (AWS/Azure/GCP)", "Modern CI/CD Pipeline"],
+      preferred: ["Kubernetes", "Datadog", "Terraform"],
+      excluded: ["Pure On-Premise Airgapped Mainframe"],
+    },
+    businessContext: {
+      characteristics: ["High engineering velocity", "Security audit requirement within 6 months"],
+      departments: ["Engineering", "Security", "DevOps", "Operations"],
+      conditions: ["Undergoing rapid hiring or cloud infrastructure migration"],
+    },
+    problemFit: {
+      primaryProblems: [
+        "High operational overhead and manual management burdens",
+        "Fragmented visibility across disparate tools and point solutions",
+        "Compliance friction slowing down production delivery",
+      ],
+      useCases: ["Unified platform migration", "Cost & risk containment", "Audit prep acceleration"],
+      businessImpact: "Up to 60% reduction in configuration time and 40% total cost of ownership savings.",
+    },
+    targetPersonas: [
+      {
+        titles: ["Chief Technology Officer", "VP of Engineering"],
+        seniority: ["C-Level", "VP"],
+        departments: ["Engineering", "Technology"],
+        decision_maker_type: "Economic Buyer",
+      },
+      {
+        titles: ["Head of Infrastructure", "Director of DevOps"],
+        seniority: ["Director"],
+        departments: ["Operations", "DevOps"],
+        decision_maker_type: "Champion",
+      },
+      {
+        titles: ["Lead Security Architect", "Staff Systems Engineer"],
+        seniority: ["Lead / Staff"],
+        departments: ["Security", "Infrastructure"],
+        decision_maker_type: "Technical Evaluator",
+      },
+    ],
+    buyingSignals: [
+      "Hiring for DevOps, Platform, or Security Engineers",
+      "Recent Series B/C funding announcement",
+      "Public cloud migration or re-architecture initiatives",
+      "Upcoming SOC 2 or ISO 27001 compliance renewal deadline",
+    ],
+    exclusions: {
+      industries: ["B2C eCommerce", "Government / Defense Classified"],
+      locations: ["Regions without supported cloud data residency"],
+      other: "Organizations with fewer than 10 technical employees",
+    },
+  }, 900);
+}
+
+export async function saveICP(payload: SaveICPInput): Promise<ICPRecord> {
+  try {
+    const res = await apiFetch("/api/icp/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        company_id: payload.companyId || mock.mockCompany.id,
+        product_id: payload.productId,
+        generation_method: payload.generationMethod,
+        name: payload.name,
+        description: payload.description || "",
+        criteria: payload.criteria,
+        raw_document_text: payload.rawDocumentText,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.icp as ICPRecord;
+    }
+  } catch {
+    // Fallback
+  }
+
+  const record: ICPRecord = {
+    id: "icp_" + Date.now(),
+    companyId: payload.companyId || mock.mockCompany.id,
+    productId: payload.productId,
+    generationMethod: payload.generationMethod,
+    name: payload.name,
+    description: payload.description,
+    criteria: payload.criteria,
+    rawDocumentText: payload.rawDocumentText,
+    isActive: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  return latency(record, 150);
+}
+
+export async function uploadICPDocument(file: File, productId?: string, companyId?: string): Promise<any> {
+  const form = new FormData();
+  form.append("file", file);
+  if (productId) form.append("product_id", productId);
+  if (companyId) form.append("company_id", companyId);
+
+  try {
+    const res = await apiFetch("/api/icp/upload", {
+      method: "POST",
+      body: form,
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {
+    // Fallback
+  }
+
+  return latency({
+    status: "success",
+    filename: file.name,
+    extracted_text_snippet: `Extracted ICP document contents from ${file.name}: Enterprise B2B tech customers with cloud operations.`,
+    canonical_icp: {
+      icpName: `Extracted ICP from ${file.name}`,
+      description: "Imported from uploaded specification document.",
+      companyProfile: {
+        industries: ["Fintech", "Healthcare IT", "Enterprise SaaS"],
+        employeeRange: { min: 250, max: 2000 },
+        revenueRange: { min: 20, max: 200, currency: "USD" },
+      },
+      targetPersonas: [
+        { titles: ["CISO", "VP of Security"], seniority: ["C-Level", "VP"], decision_maker_type: "Economic Buyer" },
+      ],
+      buyingSignals: ["Upcoming compliance audit", "Active cloud migration"],
+    },
+  }, 800);
+}
+
 

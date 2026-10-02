@@ -6,6 +6,7 @@ import Link from "next/link";
 import * as React from "react";
 import * as api from "@/lib/api";
 import { CommandPalette } from "@/components/ui/command-palette";
+import { ProductSelector } from "./product-selector";
 
 export function Topbar() {
   const [commandOpen, setCommandOpen] = React.useState(false);
@@ -23,18 +24,20 @@ export function Topbar() {
   return (
     <>
       <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border-subtle bg-raised/85 px-4 backdrop-blur-md">
-        {/* Search / Command Bar Trigger */}
-        <div className="w-full max-w-sm sm:max-w-md">
+        {/* Product Switcher & Command Search Bar */}
+        <div className="flex items-center gap-2.5 w-full max-w-md sm:max-w-xl">
+          <ProductSelector />
+          <div className="h-4 w-px bg-border-subtle shrink-0 hidden sm:block" />
           <button
             type="button"
             onClick={() => setCommandOpen(true)}
-            className="flex h-8 w-full items-center justify-between rounded-[var(--radius-sm)] border border-border-default bg-sunken/60 px-2.5 text-xs text-text-tertiary transition-colors hover:border-border-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+            className="flex h-8 flex-1 items-center justify-between rounded-[var(--radius-sm)] border border-border-default bg-sunken/60 px-2.5 text-xs text-text-tertiary transition-colors hover:border-border-strong hover:bg-sunken focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 truncate">
               <Search className="h-3.5 w-3.5 shrink-0 text-text-tertiary" />
-              <span>Search accounts, buyers, actions...</span>
+              <span className="truncate">Search accounts, buyers, actions...</span>
             </div>
-            <div className="flex items-center gap-0.5 rounded border border-border-default bg-raised px-1 py-0.5 text-[10px] font-semibold text-text-tertiary shadow-xs">
+            <div className="hidden sm:flex items-center gap-0.5 rounded border border-border-default bg-raised px-1 py-0.5 text-[10px] font-semibold text-text-tertiary shadow-xs">
               <Command className="h-2.5 w-2.5" />
               <span>K</span>
             </div>

@@ -402,3 +402,108 @@ export const PIPELINE_MODULE_META: Record<string, { step: string; icon: string; 
     description: "MEDDPICC / BANT / SPICED qualification scorecard + deal gaps.",
   },
 };
+
+// ============================================================================
+// Multi-Tenancy: Company, Product, and ICP Entities
+// ============================================================================
+
+export type ICPGenerationMethod = "llm" | "manual" | "upload";
+
+export interface Company {
+  id: string;
+  name: string;
+  domain?: string;
+  activeProductId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Product {
+  id: string;
+  companyId: string;
+  name: string;
+  description: string;
+  targetMarket?: string;
+  valueProposition?: string;
+  isActive: boolean;
+  isSelected?: boolean;
+  icpCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ICPRecord {
+  id: string;
+  companyId: string;
+  productId: string;
+  generationMethod: ICPGenerationMethod;
+  name: string;
+  description?: string;
+  criteria: {
+    companyProfile?: {
+      industries?: string[];
+      subIndustries?: string[];
+      employeeRange?: { min?: number; max?: number };
+      revenueRange?: { min?: number; max?: number; currency?: string };
+      companyStages?: string[];
+      businessModels?: string[];
+    };
+    geography?: {
+      countries?: string[];
+      regionsCities?: string[];
+    };
+    technology?: {
+      required?: string[];
+      preferred?: string[];
+      excluded?: string[];
+    };
+    targetPersonas?: Array<{
+      titles?: string[];
+      seniority?: string[];
+      departments?: string[];
+      decision_maker_type?: string;
+    }>;
+    buyingSignals?: string[];
+    problemFit?: {
+      primaryProblems?: string[];
+      useCases?: string[];
+      businessImpact?: string;
+    };
+    exclusions?: {
+      industries?: string[];
+      locations?: string[];
+      other?: string;
+    };
+  };
+  rawDocumentText?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateProductInput {
+  companyId?: string;
+  name: string;
+  description: string;
+  targetMarket?: string;
+  valueProposition?: string;
+  setAsActive?: boolean;
+}
+
+export interface GenerateICPInput {
+  productName: string;
+  productDescription: string;
+  targetMarket?: string;
+  valueProposition?: string;
+  companyName?: string;
+}
+
+export interface SaveICPInput {
+  companyId?: string;
+  productId: string;
+  generationMethod: ICPGenerationMethod;
+  name: string;
+  description?: string;
+  criteria: Record<string, any>;
+  rawDocumentText?: string;
+}

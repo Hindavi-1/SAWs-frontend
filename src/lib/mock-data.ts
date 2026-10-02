@@ -507,3 +507,55 @@ export const dashboardMetrics: DashboardMetrics = {
     { stage: "next_action", count: 19, deltaThisWeek: 3 },
   ],
 };
+
+export const mockCompany = {
+  id: "a0000000-0000-0000-0000-000000000001",
+  name: "Acme Enterprise Solutions",
+  domain: "acme.com",
+  activeProductId: "b0000000-0000-0000-0000-000000000001",
+  createdAt: daysAgo(90),
+  updatedAt: daysAgo(1),
+};
+
+export const mockProducts = [
+  {
+    id: "b0000000-0000-0000-0000-000000000001",
+    companyId: "a0000000-0000-0000-0000-000000000001",
+    name: "ZeroTrust Cloud SASE Platform",
+    description: "Next-generation cloud-native secure access service edge platform combining zero-trust network access (ZTNA), secure web gateway (SWG), and cloud data loss prevention (DLP).",
+    targetMarket: "Mid-Market to Enterprise (250-5000 employees)",
+    valueProposition: "Reduce breach surface by 85% while consolidating 4 separate networking & security vendors into a unified single agent.",
+    isActive: true,
+    isSelected: true,
+    icpCount: 2,
+    createdAt: daysAgo(45),
+    updatedAt: daysAgo(2),
+  },
+  {
+    id: "b0000000-0000-0000-0000-000000000002",
+    companyId: "a0000000-0000-0000-0000-000000000001",
+    name: "CloudData FinOps Optimizer",
+    description: "Automated AWS/GCP/Azure infrastructure cost intelligence and anomaly detection with automated cluster rightsizing.",
+    targetMarket: "Scaleups & Tech Unicorns (100-1000 engineers)",
+    valueProposition: "Guaranteed 25-40% cloud compute bill reduction within 30 days without engineering disruption.",
+    isActive: true,
+    isSelected: false,
+    icpCount: 1,
+    createdAt: daysAgo(20),
+    updatedAt: daysAgo(5),
+  },
+  {
+    id: "b0000000-0000-0000-0000-000000000003",
+    companyId: "a0000000-0000-0000-0000-000000000001",
+    name: "Healthcare Compliance Automator",
+    description: "Continuous HIPAA, HITRUST, and SOC 2 Type II compliance evidence harvesting and gap remediation workflow engine.",
+    targetMarket: "Digital Health & HealthTech SaaS Providers",
+    valueProposition: "Pass healthcare vendor security questionnaires 10x faster with auto-generated audit packets.",
+    isActive: true,
+    isSelected: false,
+    icpCount: 1,
+    createdAt: daysAgo(8),
+    updatedAt: hoursAgo(6),
+  },
+];
+
