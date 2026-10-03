@@ -1,3 +1,6 @@
+"use client";
+
+import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { FunnelBar } from "@/components/features/funnel-bar";
 import { MetricCard } from "@/components/features/metric-card";
@@ -5,7 +8,8 @@ import { AgentActivityFeed } from "@/components/features/agent-activity-feed";
 import { ApprovalCard } from "@/components/features/approval-card";
 import { RadialScore } from "@/components/ui/radial-score";
 import { StageBadge, HealthBadge } from "@/components/ui/badge";
-import { getAccounts, getAgentTasks, getApprovalQueue, getDashboardMetrics, getProducts } from "@/lib/api";
+import * as api from "@/lib/api";
+import type { Account, AgentTask, ApprovalItem, DashboardMetrics, Product } from "@/lib/types";
 import {
   Building2,
   CheckCircle2,
@@ -18,22 +22,78 @@ import {
   MailCheck,
   Zap,
   Package,
+  Loader2,
+  Users,
+  Target,
 } from "lucide-react";
 import Link from "next/link";
 
-export default async function DashboardPage() {
-  const [metrics, approvals, tasks, accounts, productsData] = await Promise.all([
-    getDashboardMetrics(),
-    getApprovalQueue(),
-    getAgentTasks(),
-    getAccounts(),
-    getProducts(),
-  ]);
+const REFRESH_INTERVAL_MS = 30_000; // 30 seconds
 
-  const activeProduct = productsData.products.find((p) => p.isSelected) || productsData.products[0];
+export default function DashboardPage() {
+  const [metrics, setMetrics] = React.useState<DashboardMetrics | null>(null);
+  const [approvals, setApprovals] = React.useState<ApprovalItem[]>([]);
+  const [tasks, setTasks] = React.useState<AgentTask[]>([]);
+  const [accounts, setAccounts] = React.useState<Account[]>([]);
+  const [activeProduct, setActiveProduct] = React.useState<Product | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  const loadAll = React.useCallback(async () => {
+    try {
+      const [m, a, t, accts, prods] = await Promise.all([
+        api.getDashboardMetrics(),
+        api.getApprovalQueue(),
+        api.getAgentTasks(),
+        api.getAccounts(),
+        api.getProducts(),
+      ]);
+      setMetrics(m);
+      setApprovals(a);
+      setTasks(t);
+      setAccounts(accts);
+      const active = prods.products.find((p) => p.isSelected) || prods.products[0] || null;
+      setActiveProduct(active);
+    } catch (err) {
+      console.error("Dashboard load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial load + auto-refresh every 30s
+  React.useEffect(() => {
+    loadAll();
+    const timer = setInterval(loadAll, REFRESH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [loadAll]);
+
+  // Listen for product switches and pipeline updates from other pages
+  React.useEffect(() => {
+    const refresh = () => loadAll();
+    window.addEventListener("sawf_product_updated", refresh);
+    window.addEventListener("sawf_pipeline_complete", refresh);
+    window.addEventListener("sawf_outreach_updated", refresh);
+    return () => {
+      window.removeEventListener("sawf_product_updated", refresh);
+      window.removeEventListener("sawf_pipeline_complete", refresh);
+      window.removeEventListener("sawf_outreach_updated", refresh);
+    };
+  }, [loadAll]);
+
+  if (loading || !metrics) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-accent-500" />
+          <p className="text-xs text-text-tertiary">Loading dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
   const pendingDrafts = approvals.filter((a) => a.kind === "outreach_email");
   const atRiskAccounts = accounts.filter((a) => a.health === "stalled" || a.daysInStage >= 10).slice(0, 4);
-  const hotAccounts = accounts.filter((a) => a.tags.includes("hot") || a.tags.includes("warm-signal")).slice(0, 6);
+  const topAccounts = accounts.filter((a) => a.fitScore >= 70).slice(0, 6);
   const runningTasks = tasks.filter((t) => t.status === "running").length;
 
   return (
@@ -54,7 +114,7 @@ export default async function DashboardPage() {
                 title="Manage product offerings"
               >
                 <Package className="h-3 w-3" />
-                <span>{activeProduct?.name || "ZeroTrust Cloud SASE Platform"}</span>
+                <span>{activeProduct?.name || "No product selected"}</span>
               </Link>
             </div>
           </div>
@@ -76,7 +136,7 @@ export default async function DashboardPage() {
                 <div className="p-2 rounded-[var(--radius-sm)] bg-agent-surface border border-agent-border">
                   <Send className="h-4 w-4 text-agent-core" />
                 </div>
-                <span className="font-mono text-2xl font-bold text-text-primary">{pendingDrafts.length}</span>
+                <span className="font-mono text-2xl font-bold text-text-primary">{metrics.pendingOutreachDrafts ?? pendingDrafts.length}</span>
               </div>
               <p className="text-sm font-semibold text-text-primary group-hover:text-agent-core transition-colors">Outreach drafts to review</p>
               <p className="text-xs text-text-tertiary mt-0.5">Agent-authored, waiting your approval</p>
@@ -86,18 +146,18 @@ export default async function DashboardPage() {
             </div>
           </Link>
 
-          {/* Accounts needing attention */}
-          <Link href="/accounts?stage=stalled" className="group">
-            <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-caution-500/25 bg-caution-50/30 dark:bg-caution-950/10 p-4 hover:border-caution-500/50 transition-all cursor-pointer">
+          {/* Buyers identified */}
+          <Link href="/accounts" className="group">
+            <div className="relative overflow-hidden rounded-[var(--radius-md)] border border-violet-500/25 bg-violet-50/30 dark:bg-violet-950/10 p-4 hover:border-violet-500/50 transition-all cursor-pointer">
               <div className="flex items-start justify-between mb-3">
-                <div className="p-2 rounded-[var(--radius-sm)] bg-caution-50 dark:bg-caution-950/30 border border-caution-200/50 dark:border-caution-800/30">
-                  <AlertCircle className="h-4 w-4 text-caution-500" />
+                <div className="p-2 rounded-[var(--radius-sm)] bg-violet-50 dark:bg-violet-950/30 border border-violet-200/50 dark:border-violet-800/30">
+                  <Users className="h-4 w-4 text-violet-500" />
                 </div>
-                <span className="font-mono text-2xl font-bold text-text-primary">{atRiskAccounts.length}</span>
+                <span className="font-mono text-2xl font-bold text-text-primary">{metrics.buyersIdentified ?? 0}</span>
               </div>
-              <p className="text-sm font-semibold text-text-primary group-hover:text-caution-600 dark:group-hover:text-caution-400 transition-colors">Accounts need attention</p>
-              <p className="text-xs text-text-tertiary mt-0.5">At-risk or stalled 10+ days in stage</p>
-              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-caution-600 dark:text-caution-400">
+              <p className="text-sm font-semibold text-text-primary group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">Buyers identified</p>
+              <p className="text-xs text-text-tertiary mt-0.5">Decision makers found across pipeline</p>
+              <div className="mt-3 flex items-center gap-1 text-xs font-medium text-violet-600 dark:text-violet-400">
                 View accounts <ArrowRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
@@ -115,7 +175,7 @@ export default async function DashboardPage() {
             <p className="text-xs text-text-tertiary mt-0.5">{metrics.qualifiedThisWeek} accounts qualified this week</p>
             <div className="mt-3 h-1 w-full bg-sunken rounded-full overflow-hidden">
               <div
-                className="h-full bg-positive-500 rounded-full"
+                className="h-full bg-positive-500 rounded-full transition-all duration-700"
                 style={{ width: `${metrics.agentSuccessRate}%` }}
               />
             </div>
@@ -125,9 +185,9 @@ export default async function DashboardPage() {
 
       {/* ── KPI STRIP ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-        <MetricCard label="Total accounts" value={metrics.totalAccounts.toLocaleString()} icon={Building2} tone="indigo" accentPct={Math.min(92, (metrics.totalAccounts / 5000) * 100)} />
-        <MetricCard label="Active discovery" value={metrics.activeDiscoveryRuns} icon={Sparkles} tone="violet" accentPct={84} />
-        <MetricCard label="Qualified / week" value={metrics.qualifiedThisWeek} icon={TrendingUp} delta={{ value: "18", positive: true }} tone="emerald" accentPct={72} />
+        <MetricCard label="Total accounts" value={metrics.totalAccounts.toLocaleString()} icon={Building2} tone="indigo" accentPct={Math.min(92, (metrics.totalAccounts / 50) * 100)} />
+        <MetricCard label="Avg fit score" value={metrics.avgFitScore ?? 0} icon={Target} tone="violet" accentPct={metrics.avgFitScore ?? 0} />
+        <MetricCard label="Qualified / week" value={metrics.qualifiedThisWeek} icon={TrendingUp} tone="emerald" accentPct={72} />
         <MetricCard label="Avg. days in stage" value={metrics.avgTimeInStageDays} suffix="days" icon={Clock} tone="cyan" accentPct={60} />
         <MetricCard label="Agent success" value={`${metrics.agentSuccessRate}%`} icon={CheckCircle2} tone="amber" accentPct={metrics.agentSuccessRate} />
       </div>
@@ -181,9 +241,16 @@ export default async function DashboardPage() {
             </div>
           </CardHeader>
           <div className="divide-y divide-border-subtle">
-            {approvals.slice(0, 4).map((item) => (
-              <ApprovalCard key={item.id} item={item} />
-            ))}
+            {approvals.length === 0 ? (
+              <div className="p-6 text-center text-xs text-text-tertiary">
+                <CheckCircle2 className="mx-auto h-6 w-6 text-positive-500/60 mb-2" />
+                No pending approvals — all caught up!
+              </div>
+            ) : (
+              approvals.slice(0, 4).map((item) => (
+                <ApprovalCard key={item.id} item={item} />
+              ))
+            )}
           </div>
         </Card>
 
@@ -208,13 +275,13 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* ── WATCHLIST ────────────────────────────────────────────────────── */}
-      {hotAccounts.length > 0 && (
+      {/* ── TOP ACCOUNTS ────────────────────────────────────────────────── */}
+      {topAccounts.length > 0 && (
         <Card className="overflow-hidden border-border-default">
           <CardHeader>
             <div>
-              <CardTitle className="text-sm font-semibold">Hot Accounts</CardTitle>
-              <CardDescription>Active buying signals detected</CardDescription>
+              <CardTitle className="text-sm font-semibold">Top-Scoring Accounts</CardTitle>
+              <CardDescription>Highest ICP fit scores in the pipeline</CardDescription>
             </div>
             <Link
               href="/accounts"
@@ -224,7 +291,7 @@ export default async function DashboardPage() {
             </Link>
           </CardHeader>
           <div className="flex gap-3 overflow-x-auto px-5 pb-5 pt-1">
-            {hotAccounts.map((a) => (
+            {topAccounts.map((a) => (
               <Link
                 key={a.id}
                 href={`/accounts/${a.id}`}

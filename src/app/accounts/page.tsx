@@ -37,9 +37,20 @@ function AccountsPageInner() {
   const [peekAccount, setPeekAccount] = React.useState<Account | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  React.useEffect(() => {
+  const loadAccounts = React.useCallback(() => {
     api.getAccounts().then(setAccounts);
   }, []);
+
+  React.useEffect(() => {
+    loadAccounts();
+    const refresh = () => loadAccounts();
+    window.addEventListener('sawf_product_updated', refresh);
+    window.addEventListener('sawf_pipeline_complete', refresh);
+    return () => {
+      window.removeEventListener('sawf_product_updated', refresh);
+      window.removeEventListener('sawf_pipeline_complete', refresh);
+    };
+  }, [loadAccounts]);
 
   const handleSelectAccount = (acc: Account) => {
     setPeekAccount(acc);

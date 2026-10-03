@@ -483,6 +483,9 @@ export default function PipelineInspectorPage() {
       setError(parseRichError(e));
     } finally {
       setLoading(false);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("sawf_pipeline_complete"));
+      }
     }
   }
 

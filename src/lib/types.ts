@@ -43,10 +43,10 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
 export type FunnelStage =
   | "discovered"
   | "verified"
-  | "qualified"
-  | "buyer_identified"
   | "researched"
+  | "buyer_identified"
   | "outreach_ready"
+  | "qualified"
   | "engaged"
   | "nurture"
   | "next_action";
@@ -54,24 +54,21 @@ export type FunnelStage =
 export const FUNNEL_STAGES: FunnelStage[] = [
   "discovered",
   "verified",
-  "qualified",
-  "buyer_identified",
   "researched",
+  "buyer_identified",
   "outreach_ready",
-  "engaged",
-  "nurture",
-  "next_action",
+  "qualified",
 ];
 
 export const STAGE_LABELS: Record<FunnelStage, string> = {
   discovered: "Discovered",
   verified: "Verified",
-  qualified: "Qualified",
-  buyer_identified: "Buyer Identified",
   researched: "Researched",
+  buyer_identified: "Buyer ID'd",
   outreach_ready: "Outreach Ready",
+  qualified: "Qualified",
   engaged: "Engaged",
-  nurture: "Nurture",
+  nurture: "Nurture / Follow-up",
   next_action: "Next Action",
 };
 
@@ -80,10 +77,10 @@ export const STAGE_LABELS: Record<FunnelStage, string> = {
 export const STAGE_GATED: Record<FunnelStage, boolean> = {
   discovered: false,
   verified: false,
-  qualified: true,
-  buyer_identified: false,
   researched: false,
+  buyer_identified: false,
   outreach_ready: true,
+  qualified: true,
   engaged: false,
   nurture: false,
   next_action: false,
@@ -266,6 +263,9 @@ export interface IcpDefinition {
   criteria: string[];
   matchingAccounts: number;
   createdAt: string;
+  criteriaCount?: number;
+  productId?: string;
+  rawCriteria?: Record<string, any>;
 }
 
 export interface FunnelStageCount {
@@ -280,6 +280,9 @@ export interface DashboardMetrics {
   qualifiedThisWeek: number;
   avgTimeInStageDays: number;
   agentSuccessRate: number;
+  pendingOutreachDrafts?: number;
+  buyersIdentified?: number;
+  avgFitScore?: number;
   funnel: FunnelStageCount[];
 }
 
@@ -347,6 +350,8 @@ export interface PipelineRunRequest {
   run_fit_evaluation?: boolean;
   max_accounts_for_buyer_research?: number;
   mode?: "live" | "mock";
+  product_id?: string;
+  company_id?: string;
 }
 
 export const PIPELINE_MODULE_ORDER = [

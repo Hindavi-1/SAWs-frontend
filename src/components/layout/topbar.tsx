@@ -10,16 +10,29 @@ import { ProductSelector } from "./product-selector";
 
 export function Topbar() {
   const [commandOpen, setCommandOpen] = React.useState(false);
-  const [pendingCount, setPendingCount] = React.useState(5);
-  const [runningAgents, setRunningAgents] = React.useState(3);
+  const [pendingCount, setPendingCount] = React.useState(0);
+  const [runningAgents, setRunningAgents] = React.useState(0);
 
-  React.useEffect(() => {
+  const loadCounts = React.useCallback(() => {
     Promise.all([api.getApprovalQueue(), api.getAgentTasks()]).then(([queue, tasks]) => {
       setPendingCount(queue.length);
       const running = tasks.filter((t) => t.status === "running").length;
-      setRunningAgents(running > 0 ? running : 2);
+      setRunningAgents(running);
     }).catch(() => {});
   }, []);
+
+  React.useEffect(() => {
+    loadCounts();
+    const refresh = () => loadCounts();
+    window.addEventListener("sawf_product_updated", refresh);
+    window.addEventListener("sawf_outreach_updated", refresh);
+    window.addEventListener("sawf_pipeline_complete", refresh);
+    return () => {
+      window.removeEventListener("sawf_product_updated", refresh);
+      window.removeEventListener("sawf_outreach_updated", refresh);
+      window.removeEventListener("sawf_pipeline_complete", refresh);
+    };
+  }, [loadCounts]);
 
   return (
     <>

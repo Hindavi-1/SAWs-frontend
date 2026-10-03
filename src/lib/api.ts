@@ -37,20 +37,207 @@ import type {
 const latency = <T,>(value: T, ms = 0): Promise<T> =>
   ms > 0 ? new Promise((resolve) => setTimeout(() => resolve(value), ms)) : Promise.resolve(value);
 
-export async function getDashboardMetrics(): Promise<DashboardMetrics> {
-  return latency(mock.dashboardMetrics);
+export async function getDashboardMetrics(productId?: string): Promise<DashboardMetrics> {
+  try {
+    if (!productId) {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+    }
+    const url = productId
+      ? `/api/metrics/dashboard?product_id=${productId}`
+      : `/api/metrics/dashboard`;
+    const res = await apiFetch(url, { cache: "no-store" });
+    if (res.ok) {
+      const d = await res.json();
+      return {
+        totalAccounts: d.total_accounts ?? 0,
+        activeDiscoveryRuns: d.active_discovery_runs ?? 0,
+        qualifiedThisWeek: d.qualified_this_week ?? 0,
+        avgTimeInStageDays: d.avg_time_in_stage_days ?? 0,
+        agentSuccessRate: d.agent_success_rate ?? 0,
+        pendingOutreachDrafts: d.pending_outreach_drafts ?? 0,
+        buyersIdentified: d.buyers_identified ?? 0,
+        avgFitScore: d.avg_fit_score ?? 0,
+        funnel: (d.funnel ?? []).map((f: any) => ({
+          stage: f.stage,
+          count: f.count,
+          deltaThisWeek: f.delta_this_week ?? 0,
+        })),
+      };
+    }
+  } catch {
+    // Fallback: compute locally
+  }
+  const accounts = await getAccounts(productId);
+  const totalAccounts = accounts.length;
+  const qualifiedThisWeek = accounts.filter((a) => a.stage === "qualified").length;
+  const totalDays = accounts.reduce((acc, curr) => acc + (curr.daysInStage || 0), 0);
+  const avgTimeInStageDays = totalAccounts ? Math.round(totalDays / totalAccounts) : 0;
+  const agentSuccessRate = totalAccounts ? 100 : 0;
+  const stages = { discovered: 0, researched: 0, buyer_identified: 0, outreach_ready: 0, qualified: 0 };
+  accounts.forEach((a) => { if (a.stage in stages) stages[a.stage as keyof typeof stages]++; });
+  return {
+    totalAccounts,
+    activeDiscoveryRuns: 0,
+    qualifiedThisWeek,
+    avgTimeInStageDays,
+    agentSuccessRate,
+    pendingOutreachDrafts: 0,
+    buyersIdentified: 0,
+    avgFitScore: totalAccounts ? Math.round(accounts.reduce((s, a) => s + a.fitScore, 0) / totalAccounts) : 0,
+    funnel: [
+      { stage: "discovered", count: stages.discovered, deltaThisWeek: 0 },
+      { stage: "researched", count: stages.researched, deltaThisWeek: 0 },
+      { stage: "buyer_identified", count: stages.buyer_identified, deltaThisWeek: 0 },
+      { stage: "outreach_ready", count: stages.outreach_ready, deltaThisWeek: 0 },
+      { stage: "qualified", count: stages.qualified, deltaThisWeek: 0 },
+    ],
+  };
 }
 
-export async function getAccounts(): Promise<Account[]> {
+export async function getAccounts(productId?: string): Promise<Account[]> {
+  try {
+    if (!productId) {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+    }
+    const url = productId ? `/api/discovery/accounts?product_id=${productId}` : "/api/discovery/accounts";
+    const res = await apiFetch(url, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.accounts)) {
+        return data.accounts.map((a: any) => {
+          const score = typeof a.fit_score === "number" ? a.fit_score : 0;
+          const confidence =
+            score >= 80 ? "high" : score >= 60 ? "medium" : "low";
+          const stageMap: Record<string, Account["stage"]> = {
+            verified: "verified",
+            discovered: "discovered",
+            rejected: "discovered",
+            researched: "researched",
+            buyer_identified: "buyer_identified",
+            outreach_ready: "outreach_ready",
+            qualified: "qualified",
+          };
+          const stage =
+            stageMap[a.verification_status as string] ??
+            stageMap[a.stage as string] ??
+            "discovered";
+          return {
+            id: a.id,
+            name: a.name,
+            domain: a.domain,
+            industry: a.industry || "Technology",
+            employeeRange: a.employee_count
+              ? `${a.employee_count}`
+              : "500-1000",
+            hqLocation: a.region || "North America",
+            logoInitial: (a.name || "A")[0].toUpperCase(),
+            stage,
+            health: "on_track" as const,
+            fitScore: score,
+            confidence: confidence as Account["confidence"],
+            icpId: a.icp_id || "",
+            icpName: a.icp_name || "",
+            daysInStage: 0,
+            discoveredAt: a.created_at || new Date().toISOString(),
+            lastActivityAt: a.updated_at || new Date().toISOString(),
+            discoveryReasons: a.match_reasons || [],
+            tags: [],
+          };
+        });
+      }
+    }
+  } catch {
+    // Fallback to mock data only if fetch fails
+  }
   return latency(mock.accounts);
 }
 
 export async function getAccount(id: string): Promise<Account | undefined> {
+  try {
+    const res = await apiFetch(`/api/discovery/accounts/${id}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.account) {
+        const a = data.account;
+        const score = typeof a.fit_score === "number" ? a.fit_score : 0;
+        const confidence =
+          score >= 80 ? "high" : score >= 60 ? "medium" : "low";
+        const stageMap: Record<string, Account["stage"]> = {
+          verified: "verified",
+          discovered: "discovered",
+          rejected: "discovered",
+          researched: "researched",
+          buyer_identified: "buyer_identified",
+          outreach_ready: "outreach_ready",
+          qualified: "qualified",
+        };
+        const stage =
+          stageMap[a.verification_status as string] ??
+          stageMap[a.stage as string] ??
+          "discovered";
+        return {
+          id: a.id,
+          name: a.name,
+          domain: a.domain,
+          industry: a.industry || "Technology",
+          employeeRange: a.employee_count
+            ? `${a.employee_count}`
+            : "500-1000",
+          hqLocation: a.region || "North America",
+          logoInitial: (a.name || "A")[0].toUpperCase(),
+          stage,
+          health: "on_track" as const,
+          fitScore: score,
+          confidence: confidence as Account["confidence"],
+          icpId: a.icp_id || "",
+          icpName: a.icp_name || "",
+          daysInStage: 0,
+          discoveredAt: a.created_at || new Date().toISOString(),
+          lastActivityAt: a.updated_at || new Date().toISOString(),
+          discoveryReasons: a.match_reasons || [],
+          tags: [],
+        };
+      }
+    }
+  } catch {
+    // Fallback
+  }
   return latency(mock.accounts.find((a) => a.id === id));
 }
 
-export async function getIcps(): Promise<IcpDefinition[]> {
-  return latency(mock.icps);
+export async function getIcps(productId?: string): Promise<IcpDefinition[]> {
+  try {
+    if (!productId) {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+    }
+    if (productId) {
+      const res = await apiFetch(`/api/icp/list?product_id=${productId}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.icps)) {
+          return data.icps.map((icp: any) => ({
+            id: icp.id,
+            name: icp.name,
+            description: icp.description || "",
+            productId: icp.product_id,
+            criteria: Array.isArray(icp.criteria?.buyingSignals)
+              ? icp.criteria.buyingSignals
+              : (icp.criteria?.companyProfile?.industries || ["Enterprise Tech"]),
+            matchingAccounts: 0,
+            criteriaCount: Object.keys(icp.criteria || {}).length,
+            rawCriteria: icp.criteria,
+            createdAt: icp.created_at,
+          }));
+        }
+      }
+    }
+  } catch {
+    // Fallback to empty list
+  }
+  return [];
 }
 
 export async function getEvidenceForAccount(accountId: string): Promise<EvidenceItem[]> {
@@ -62,31 +249,157 @@ export async function getIcpFitForAccount(accountId: string): Promise<IcpCriteri
 }
 
 export async function getBuyersForAccount(accountId: string): Promise<Buyer[]> {
+  try {
+    const res = await apiFetch(`/api/buyers/${accountId}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.buyers)) {
+        return data.buyers.map((b: any) => ({
+          id: b.id,
+          accountId: b.account_id,
+          name: b.name,
+          title: b.title,
+          seniority: (b.seniority as Buyer["seniority"]) || "Director",
+          relevanceScore: 80,
+          email: b.email,
+          linkedinUrl: b.linkedin_url,
+          engagementState: "not_contacted" as const,
+        }));
+      }
+    }
+  } catch {
+    // Fallback
+  }
   return latency(mock.buyersByAccount[accountId] ?? []);
 }
 
 export async function getQualificationForAccount(accountId: string): Promise<QualificationCriterion[]> {
+  try {
+    const res = await apiFetch(`/api/qualification/${accountId}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.criteria)) {
+        return data.criteria.map((c: any) => {
+          const score = typeof c.score === "number" ? c.score : 0;
+          const status: QualificationCriterion["status"] =
+            score >= 70 ? "met" : score >= 40 ? "unclear" : "unmet";
+          return {
+            id: c.id,
+            label: c.label,
+            status,
+            agentRationale: `Qualification score: ${score}/100. Risk: ${c.risk || "unclear"}.`,
+            evidenceIds: [],
+          };
+        });
+      }
+    }
+  } catch {
+    // Fallback to mock data
+  }
   return latency(mock.qualificationByAccount[accountId] ?? []);
 }
 
 export async function getOutreachForAccount(accountId: string): Promise<OutreachMessage[]> {
+  try {
+    const res = await apiFetch(`/api/outreach/${accountId}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.messages)) {
+        return data.messages.map((m: any) => ({
+          id: m.id,
+          accountId: m.account_id,
+          buyerId: m.buyer_id,
+          sequenceStep: m.step_number || 0,
+          channel: (m.channel as OutreachMessage["channel"]) || "email",
+          subject: m.subject,
+          body: m.body,
+          status: m.status as OutreachMessage["status"],
+          rejectionReason: m.rejection_reason,
+          lastEditedAt: m.last_edited_at,
+          createdAt: m.created_at,
+        }));
+      }
+    }
+  } catch {
+    // Fallback
+  }
   return latency(mock.outreachByAccount[accountId] ?? []);
 }
 
-export async function getAllOutreachMessages(): Promise<OutreachMessage[]> {
+export async function getAllOutreachMessages(productId?: string): Promise<OutreachMessage[]> {
+  try {
+    if (!productId) {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+    }
+    const url = productId ? `/api/outreach?product_id=${productId}` : "/api/outreach";
+    const res = await apiFetch(url, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.messages)) {
+        return data.messages.map((m: any) => ({
+          id: m.id,
+          accountId: m.account_id,
+          buyerId: m.buyer_id,
+          sequenceStep: m.step_number || 0,
+          channel: (m.channel as OutreachMessage["channel"]) || "email",
+          subject: m.subject,
+          body: m.body,
+          status: m.status as OutreachMessage["status"],
+          rejectionReason: m.rejection_reason,
+          lastEditedAt: m.last_edited_at,
+          createdAt: m.created_at,
+        }));
+      }
+    }
+  } catch {
+    // Fallback
+  }
   const all = Object.values(mock.outreachByAccount).flat();
   return latency(all);
 }
 
-export async function getPendingOutreachDrafts(): Promise<OutreachMessage[]> {
-  const all = Object.values(mock.outreachByAccount).flat();
-  return latency(all.filter((m) => m.status === "pending_approval"));
+export async function getPendingOutreachDrafts(productId?: string): Promise<OutreachMessage[]> {
+  const all = await getAllOutreachMessages(productId);
+  return all.filter((m) => m.status === "pending_approval");
 }
 
 export async function updateOutreachDraft(
   id: string,
   updates: Partial<OutreachMessage>
 ): Promise<OutreachMessage | undefined> {
+  try {
+    const res = await apiFetch(`/api/outreach/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: updates.status || "pending_approval",
+        body: updates.body,
+        subject: updates.subject,
+        rejection_reason: updates.rejectionReason,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const m = data.message;
+      return {
+        id: m.id,
+        accountId: m.account_id,
+        buyerId: m.buyer_id,
+        sequenceStep: m.step_number || 0,
+        channel: (m.channel as OutreachMessage["channel"]) || "email",
+        subject: m.subject,
+        body: m.body,
+        status: m.status as OutreachMessage["status"],
+        rejectionReason: m.rejection_reason,
+        lastEditedAt: m.last_edited_at,
+        createdAt: m.created_at,
+      };
+    }
+  } catch {
+    // Fallback
+  }
+
   for (const accountId in mock.outreachByAccount) {
     const list = mock.outreachByAccount[accountId];
     const index = list.findIndex((m) => m.id === id);
@@ -124,20 +437,35 @@ export async function rejectOutreachDraft(
   });
 }
 
+
 export async function getObjectionsForAccount(accountId: string): Promise<Objection[]> {
   return latency(mock.objectionsByAccount[accountId] ?? []);
 }
 
 export async function getAgentTasks(): Promise<AgentTask[]> {
-  return latency(mock.agentTasks);
+  return []; // Removed fake tasks
 }
 
 export async function getAgentTasksForAccount(accountId: string): Promise<AgentTask[]> {
-  return latency(mock.agentTasks.filter((t) => t.accountId === accountId));
+  return []; // Removed fake tasks
 }
 
 export async function getApprovalQueue(): Promise<ApprovalItem[]> {
-  return latency(mock.approvalQueue);
+  const drafts = await getPendingOutreachDrafts();
+  return drafts.map((d) => ({
+    id: d.id,
+    kind: "outreach_email",
+    title: `Review Outreach: ${d.subject || "No Subject"}`,
+    description: `Needs review before sending to ${d.buyerId || "Buyer"}`,
+    status: "pending",
+    createdAt: d.createdAt || new Date().toISOString(),
+    requestedAt: d.createdAt || new Date().toISOString(),
+    accountId: d.accountId,
+    accountName: `Account ID: ${d.accountId.substring(0, 8)}`,
+    moduleId: "personalized_outreach",
+    urgency: "high",
+    actionPath: `/outreach-review`,
+  }));
 }
 
 export async function getModuleStatuses(): Promise<ModuleStatus[]> {
@@ -186,10 +514,28 @@ export async function getBackendHealth(): Promise<{ status: string; modules: str
 }
 
 export async function runPipelineTrace(req: PipelineRunRequest): Promise<PipelineTraceResponse> {
+  let productId = req.product_id;
+  let companyId = req.company_id;
+  if (!productId) {
+    try {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+      companyId = prods.company?.id || undefined;
+    } catch {
+      // ignore
+    }
+  }
+
+  const payload: PipelineRunRequest = {
+    ...req,
+    product_id: productId,
+    company_id: companyId,
+  };
+
   const res = await apiFetch("/api/tracer/run-pipeline", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(req),
+    body: JSON.stringify(payload),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -206,11 +552,28 @@ export async function runPipelineTraceUpload(params: {
   run_fit_evaluation?: boolean;
   max_accounts_for_buyer_research?: number;
   mode?: "live" | "mock";
+  product_id?: string;
+  company_id?: string;
 }): Promise<PipelineTraceResponse> {
+  // Auto-resolve product_id if not provided
+  let productId = params.product_id;
+  let companyId = params.company_id;
+  if (!productId) {
+    try {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+      companyId = prods.company?.id || undefined;
+    } catch {
+      // ignore
+    }
+  }
+
   const form = new FormData();
   if (params.raw_icp_text) form.append("raw_icp_text", params.raw_icp_text);
   if (params.icp_file) form.append("icp_file", params.icp_file);
   if (params.mode) form.append("mode", params.mode);
+  if (productId) form.append("product_id", productId);
+  if (companyId) form.append("company_id", companyId);
   if (params.run_verification !== undefined) {
     form.append("run_verification", String(params.run_verification));
   }
@@ -562,5 +925,8 @@ export async function uploadICPDocument(file: File, productId?: string, companyI
     },
   }, 800);
 }
+
+
+
 
 

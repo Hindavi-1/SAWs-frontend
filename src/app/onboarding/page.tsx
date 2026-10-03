@@ -30,12 +30,14 @@ import {
   Briefcase,
   DollarSign,
   TrendingUp,
+  Play,
 } from "lucide-react";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = React.useState<1 | 2 | 3>(1);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [createdProductForModal, setCreatedProductForModal] = React.useState<any>(null);
 
   // Step 1: Product Definition State
   const [companyName, setCompanyName] = React.useState("Acme Enterprise Solutions");
@@ -207,8 +209,8 @@ export default function OnboardingPage() {
         description: `Active pipeline switched to: ${product.name}`,
       });
 
-      // Navigate to dashboard
-      router.push("/");
+      // Show auto discovery pop-up modal
+      setCreatedProductForModal(product);
     } catch {
       toast.error("An error occurred while saving. Please try again.");
     } finally {
@@ -874,6 +876,50 @@ export default function OnboardingPage() {
                     <span>Confirm &amp; Launch Sales Pipeline</span>
                   </>
                 )}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Pop-Up Modal Screen for Auto ICP Extraction & Discovery */}
+      {createdProductForModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
+          <Card className="w-full max-w-lg border-accent-500/40 bg-raised p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-accent-500/10 border border-accent-500/30 text-accent-500">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-text-primary">Product &amp; ICP Configured!</h3>
+                <p className="text-xs text-text-tertiary">Active Product: {createdProductForModal.name}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border-subtle bg-sunken/60 p-4 space-y-2">
+              <p className="text-xs text-text-secondary leading-relaxed">
+                Would you like to automatically start <strong>ICP Extraction</strong> and run <strong>Account Discovery</strong> for <span className="font-semibold text-text-primary">{createdProductForModal.name}</span> right now?
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <Button
+                className="w-full sm:flex-1 gap-2"
+                onClick={() => {
+                  router.push("/discovery?autoRun=true");
+                }}
+              >
+                <Play className="h-4 w-4 text-white" />
+                <span>⚡ Start Discovery Now</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full sm:w-auto"
+                onClick={() => {
+                  router.push("/");
+                }}
+              >
+                Skip to Dashboard
               </Button>
             </div>
           </Card>

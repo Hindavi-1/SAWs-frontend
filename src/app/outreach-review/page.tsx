@@ -87,6 +87,7 @@ export default function OutreachReviewPage() {
       });
 
       advanceToNext(draftId);
+      window.dispatchEvent(new Event("sawf_outreach_updated"));
     },
     [allDrafts, advanceToNext]
   );
@@ -111,6 +112,7 @@ export default function OutreachReviewPage() {
       });
 
       advanceToNext(targetId);
+      window.dispatchEvent(new Event("sawf_outreach_updated"));
     },
     [selectedDraft, advanceToNext]
   );
