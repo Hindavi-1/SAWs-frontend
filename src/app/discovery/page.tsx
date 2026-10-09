@@ -9,10 +9,9 @@ import { Drawer } from "@/components/ui/drawer";
 import { ConfidenceBadge } from "@/components/ui/badge";
 import { RadialScore } from "@/components/ui/radial-score";
 import * as api from "@/lib/api";
-import { evidenceByAccount, icpFitByAccount } from "@/lib/mock-data";
 import type { Account, IcpDefinition } from "@/lib/types";
-import { CheckCircle2, ChevronDown, Loader2, Play, Sparkles, Table2, LayoutGrid, FileText, UploadCloud, Trash2, FileUp } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { CheckCircle2, Loader2, Play, Sparkles, Table2, LayoutGrid, FileText, UploadCloud, Trash2, FileUp, ArrowRight } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import * as React from "react";
@@ -30,6 +29,7 @@ export default function DiscoveryPage() {
 function DiscoveryPageInner() {
   const searchParams = useSearchParams();
   const autoRunParam = searchParams.get("autoRun");
+  const router = useRouter();
 
   const [icpMode, setIcpMode] = React.useState<"existing" | "text" | "upload">("existing");
   const [icps, setIcps] = React.useState<IcpDefinition[]>([]);
@@ -44,6 +44,7 @@ function DiscoveryPageInner() {
   const [results, setResults] = React.useState<Account[]>([]);
   const [view, setView] = React.useState<"grid" | "table">("grid");
   const [activeAccount, setActiveAccount] = React.useState<Account | null>(null);
+  const [advancingId, setAdvancingId] = React.useState<string | null>(null);
 
   const loadInitialData = React.useCallback(async () => {
     const loadedIcps = await api.getIcps();
@@ -150,18 +151,42 @@ function DiscoveryPageInner() {
     }, 1200);
 
     try {
+      let newlyDiscovered: Account[] = [];
       if (icpMode === "existing" && selectedIcp) {
-        await api.runPipelineTrace({
-          raw_icp_text: selectedIcp.description || selectedIcp.name,
-          canonical_icp: selectedIcp.rawCriteria,
+        newlyDiscovered = await api.runDiscovery({
+          icpId: selectedIcp.id,
+          icp: selectedIcp.rawCriteria,
         });
       } else if (icpMode === "upload" && uploadedFile) {
-        await api.runPipelineTraceUpload({ icp_file: uploadedFile });
+        const uploadResult = await api.uploadICPDocument(uploadedFile);
+        if (uploadResult && uploadResult.canonical_icp) {
+          newlyDiscovered = await api.runDiscovery({
+            icp: uploadResult.canonical_icp,
+          });
+        }
       } else if (icpText) {
-        await api.runPipelineTrace({ raw_icp_text: icpText });
+        newlyDiscovered = await api.runDiscovery({
+          icp: {
+            icpName: "Custom Target Segment",
+            description: icpText,
+            companyProfile: {
+              industries: ["Technology", "Software", "Enterprise Services"],
+              employeeRange: { min: 100, max: 2000 },
+            },
+            targetPersonas: [
+              { titles: ["VP", "Director", "Head of Sales", "CTO"], seniority: ["VP", "Director"], decision_maker_type: "Economic Buyer" }
+            ],
+            buyingSignals: ["Active software evaluation", "Modern cloud operations"]
+          }
+        });
       }
+
+      toast.success(
+        `Discovery complete! ${newlyDiscovered.length > 0 ? `Identified ${newlyDiscovered.length} accounts.` : "Queried live data sources."}`
+      );
     } catch (err) {
       console.error("Discovery run failed:", err);
+      toast.error("Account discovery run encountered an issue.");
     } finally {
       clearInterval(interval);
       setRunStep(RUN_STEPS.length - 1);
@@ -173,6 +198,33 @@ function DiscoveryPageInner() {
       }
     }
   }
+
+  // Wire "Verify & Advance" to the backend workflow API (M03–M06)
+  const handleVerifyAndAdvance = async (account: Account) => {
+    if (!account.id) return;
+    setAdvancingId(account.id);
+    try {
+      toast.info("Running pipeline…", {
+        description: `Running M03–M06 for ${account.name}`,
+      });
+      await api.advanceAccountWorkflow(account.id, "all");
+      toast.success("Pipeline complete!", {
+        description: `${account.name} advanced through M03–M06.`,
+      });
+      // Refresh list and update drawer
+      const all = await api.getAccounts();
+      setResults(all);
+      const updated = all.find((a) => a.id === account.id);
+      if (updated) setActiveAccount(updated);
+    } catch (err: any) {
+      console.error("Advance failed:", err);
+      toast.error("Pipeline failed", {
+        description: err?.message || "Check backend logs.",
+      });
+    } finally {
+      setAdvancingId(null);
+    }
+  };
 
   const canRun =
     (icpMode === "existing" && !!selectedIcpId) ||
@@ -421,7 +473,7 @@ function DiscoveryPageInner() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-text-primary">
-                        Click to select or drag & drop
+                        Click to select or drag &amp; drop
                       </p>
                       <p className="mt-0.5 text-[11px] text-text-tertiary">
                         Supports Word (.docx), JSON, or text files
@@ -490,18 +542,29 @@ function DiscoveryPageInner() {
                 <thead>
                   <tr className="border-b border-border-subtle text-left text-xs text-text-tertiary">
                     <th className="px-5 py-2.5 font-medium">Account</th>
+                    <th className="px-3 py-2.5 font-medium">Stage</th>
                     <th className="px-3 py-2.5 font-medium">Fit score</th>
                     <th className="px-3 py-2.5 font-medium">Confidence</th>
                     <th className="px-3 py-2.5 font-medium">Signals</th>
+                    <th className="px-3 py-2.5 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {results.map((a) => (
-                    <tr key={a.id} onClick={() => setActiveAccount(a)} className="cursor-pointer border-b border-border-subtle last:border-0 hover:bg-sunken">
-                      <td className="px-5 py-3 font-medium text-text-primary">{a.name}</td>
+                    <tr key={a.id} className="border-b border-border-subtle last:border-0 hover:bg-sunken">
+                      <td className="px-5 py-3 font-medium text-text-primary cursor-pointer" onClick={() => setActiveAccount(a)}>{a.name}</td>
+                      <td className="px-3 py-3 text-xs text-text-secondary capitalize">{a.stage.replace("_", " ")}</td>
                       <td className="px-3 py-3 font-mono">{a.fitScore}</td>
                       <td className="px-3 py-3"><ConfidenceBadge level={a.confidence} /></td>
-                      <td className="px-3 py-3 text-text-secondary">{a.discoveryReasons.join(", ")}</td>
+                      <td className="px-3 py-3 text-text-secondary text-xs">{a.discoveryReasons.slice(0, 2).join(", ")}</td>
+                      <td className="px-3 py-3">
+                        <button
+                          className="text-xs text-accent-500 hover:underline font-medium"
+                          onClick={() => router.push(`/accounts/${a.id}`)}
+                        >
+                          View →
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -523,7 +586,10 @@ function DiscoveryPageInner() {
               <RadialScore value={activeAccount.fitScore} size={64} label="fit" />
               <div>
                 <ConfidenceBadge level={activeAccount.confidence} />
-                <p className="mt-1.5 text-xs text-text-tertiary">Discovered via {activeAccount.icpName}</p>
+                <p className="mt-1.5 text-xs text-text-tertiary capitalize">
+                  Stage: <strong className="text-text-secondary">{activeAccount.stage.replace("_", " ")}</strong>
+                </p>
+                <p className="mt-0.5 text-xs text-text-tertiary">Discovered via {activeAccount.icpName || "ICP"}</p>
               </div>
             </div>
 
@@ -536,29 +602,30 @@ function DiscoveryPageInner() {
               </ul>
             </div>
 
-            {icpFitByAccount[activeAccount.id] && (
-              <div>
-                <p className="mb-2 text-xs font-semibold text-text-secondary">ICP fit breakdown</p>
-                <ul className="space-y-2">
-                  {icpFitByAccount[activeAccount.id].map((c) => (
-                    <li key={c.criterion} className="flex items-center justify-between text-sm">
-                      <span className="text-text-secondary">{c.criterion}</span>
-                      <span className="font-mono text-text-primary">{c.score}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div>
-              <p className="mb-2 text-xs font-semibold text-text-secondary">Evidence</p>
-              <EvidenceList items={evidenceByAccount[activeAccount.id] ?? []} />
-            </div>
-
-            <div className="flex gap-2 border-t border-border-subtle pt-4">
-              <Button className="flex-1">Verify & Advance</Button>
-              <Button variant="secondary">Watchlist</Button>
-              <Button variant="ghost">Reject</Button>
+            <div className="flex gap-2 border-t border-border-subtle pt-4 flex-wrap">
+              <Button
+                className="flex-1"
+                disabled={advancingId === activeAccount.id}
+                onClick={() => handleVerifyAndAdvance(activeAccount)}
+              >
+                {advancingId === activeAccount.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {advancingId === activeAccount.id ? "Running M03–M06…" : "Verify & Advance"}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setActiveAccount(null);
+                  router.push(`/accounts/${activeAccount.id}`);
+                }}
+              >
+                <ArrowRight className="h-3.5 w-3.5" />
+                View Account
+              </Button>
+              <Button variant="ghost">Watchlist</Button>
             </div>
           </div>
         )}

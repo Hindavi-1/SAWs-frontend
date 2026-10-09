@@ -5,12 +5,15 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Buyer } from "@/lib/types";
-import { Mail, Sparkles, UserPlus, ShieldCheck, CheckCircle2 } from "lucide-react";
+import { Mail, Sparkles, UserPlus, ShieldCheck, CheckCircle2, Loader2 } from "lucide-react";
+import * as api from "@/lib/api";
 import { toast } from "@/components/ui/toaster";
 
 interface AccountBuyersTabProps {
   buyers: Buyer[];
   accountName: string;
+  accountId?: string;
+  onBuyersUpdated?: () => void;
 }
 
 function LinkedinIcon({ className }: { className?: string }) {
@@ -21,28 +24,42 @@ function LinkedinIcon({ className }: { className?: string }) {
   );
 }
 
-export function AccountBuyersTab({ buyers, accountName }: AccountBuyersTabProps) {
+export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdated }: AccountBuyersTabProps) {
   const [findingMore, setFindingMore] = React.useState(false);
 
-  const handleFindMore = () => {
+  const handleFindMore = async () => {
+    if (!accountId) return;
     setFindingMore(true);
     toast.info("Discovering decision makers", {
-      description: `Searching LinkedIn & executive directories for ${accountName}`,
+      description: `Searching LinkedIn & executive directories for ${accountName} (M05)...`,
     });
-    setTimeout(() => {
-      setFindingMore(false);
+    try {
+      await api.identifyBuyers(accountId);
       toast.success("Buyer identification complete", {
-        description: `Verified contacts and mapped organizational chart`,
+        description: `Verified contacts and mapped organizational chart for ${accountName}`,
       });
-    }, 1500);
+      onBuyersUpdated?.();
+    } catch (err: any) {
+      console.error("Buyer identification failed:", err);
+      toast.error("Buyer identification failed", {
+        description: err?.message || "Could not identify buyers. Check backend logs.",
+      });
+    } finally {
+      setFindingMore(false);
+    }
   };
 
   if (buyers.length === 0) {
     return (
       <Card className="p-8 text-center border-border-default">
         <p className="text-xs text-text-tertiary">No decision makers identified for this account yet.</p>
-        <Button size="sm" className="mt-3" onClick={handleFindMore}>
-          <Sparkles className="h-3.5 w-3.5" /> Run Buyer Identification
+        <Button size="sm" className="mt-3" onClick={handleFindMore} disabled={findingMore}>
+          {findingMore ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Sparkles className="h-3.5 w-3.5" />
+          )}
+          {findingMore ? "Identifying Buyers..." : "Run Buyer Identification (M05)"}
         </Button>
       </Card>
     );
@@ -60,7 +77,11 @@ export function AccountBuyersTab({ buyers, accountName }: AccountBuyersTabProps)
           onClick={handleFindMore}
           disabled={findingMore}
         >
-          <UserPlus className="h-3.5 w-3.5" />
+          {findingMore ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserPlus className="h-3.5 w-3.5" />
+          )}
           {findingMore ? "Searching..." : "Find More Buyers"}
         </Button>
       </div>

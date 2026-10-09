@@ -18,17 +18,21 @@ import {
   ArrowRight,
   Mail,
   ShieldCheck,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface AccountPeekDrawerProps {
   account: Account | null;
   open: boolean;
   onClose: () => void;
+  onAccountUpdated?: () => void;
 }
 
-export function AccountPeekDrawer({ account, open, onClose }: AccountPeekDrawerProps) {
+export function AccountPeekDrawer({ account, open, onClose, onAccountUpdated }: AccountPeekDrawerProps) {
   const [buyers, setBuyers] = React.useState<Buyer[]>([]);
   const [outreach, setOutreach] = React.useState<OutreachMessage[]>([]);
+  const [advancing, setAdvancing] = React.useState(false);
 
   React.useEffect(() => {
     if (account?.id) {
@@ -36,6 +40,24 @@ export function AccountPeekDrawer({ account, open, onClose }: AccountPeekDrawerP
       api.getOutreachForAccount(account.id).then(setOutreach);
     }
   }, [account?.id]);
+
+  const handleAdvance = async () => {
+    if (!account?.id) return;
+    setAdvancing(true);
+    try {
+      toast.info(`Advancing ${account.name}…`);
+      await api.advanceAccountWorkflow(account.id, "next");
+      toast.success(`${account.name} advanced to next pipeline stage!`);
+      // Refresh buyers
+      api.getBuyersForAccount(account.id).then(setBuyers);
+      onAccountUpdated?.();
+    } catch (err: any) {
+      console.error("Advance failed:", err);
+      toast.error(err?.message || "Could not advance account");
+    } finally {
+      setAdvancing(false);
+    }
+  };
 
   if (!account) return null;
 
@@ -162,14 +184,30 @@ export function AccountPeekDrawer({ account, open, onClose }: AccountPeekDrawerP
         </dl>
 
         {/* Bottom Full Action */}
-        <div className="pt-2 border-t border-border-subtle flex gap-2">
-          <Link href={`/accounts/${account.id}`} className="flex-1">
-            <Button className="w-full gap-1.5 font-bold" size="sm">
-              Open Full Account View <ArrowRight className="h-3.5 w-3.5" />
+        <div className="pt-2 border-t border-border-subtle flex flex-col gap-2">
+          <div className="flex gap-2">
+            <Button
+              className="flex-1 gap-1.5"
+              variant="outline"
+              size="sm"
+              onClick={handleAdvance}
+              disabled={advancing}
+            >
+              {advancing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 text-agent-core" />
+              )}
+              {advancing ? "Advancing…" : "Advance Stage (M03–M06)"}
             </Button>
-          </Link>
-          <Button variant="secondary" size="sm" onClick={onClose}>
-            Close
+            <Link href={`/accounts/${account.id}`} className="flex-1">
+              <Button className="w-full gap-1.5 font-bold" size="sm">
+                Open Full View <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </div>
+          <Button variant="ghost" size="xs" onClick={onClose} className="text-text-tertiary">
+            Close Drawer
           </Button>
         </div>
       </div>

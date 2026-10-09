@@ -144,6 +144,7 @@ export async function getAccounts(productId?: string): Promise<Account[]> {
             lastActivityAt: a.updated_at || new Date().toISOString(),
             discoveryReasons: a.match_reasons || [],
             tags: [],
+            verificationStatus: a.verification_status || (stage === "verified" ? "verified" : "unverified"),
           };
         });
       }
@@ -198,6 +199,7 @@ export async function getAccount(id: string): Promise<Account | undefined> {
           lastActivityAt: a.updated_at || new Date().toISOString(),
           discoveryReasons: a.match_reasons || [],
           tags: [],
+          verificationStatus: a.verification_status || (stage === "verified" ? "verified" : "unverified"),
         };
       }
     }
@@ -241,10 +243,81 @@ export async function getIcps(productId?: string): Promise<IcpDefinition[]> {
 }
 
 export async function getEvidenceForAccount(accountId: string): Promise<EvidenceItem[]> {
+  try {
+    const dossier = await getAccountDossier(accountId);
+    if (dossier) {
+      const items: EvidenceItem[] = [];
+      const now = new Date().toISOString();
+      if (Array.isArray(dossier.recent_news_signals)) {
+        dossier.recent_news_signals.forEach((n: any, idx: number) => {
+          const headline = typeof n === "string" ? n : (n.headline || n.summary || JSON.stringify(n));
+          items.push({
+            id: `ev_news_${idx}`,
+            claim: headline,
+            sourceName: (typeof n === "object" && n.source) || "Verified News",
+            sourceUrl: typeof n === "object" ? n.url : undefined,
+            confidence: "high",
+            collectedAt: (typeof n === "object" && n.date) || now,
+            moduleId: "account_research",
+          });
+        });
+      }
+      if (Array.isArray(dossier.pain_points)) {
+        dossier.pain_points.forEach((p: any, idx: number) => {
+          items.push({
+            id: `ev_pain_${idx}`,
+            claim: typeof p === "string" ? p : (p.description || JSON.stringify(p)),
+            sourceName: "Operational Intelligence",
+            confidence: "high",
+            collectedAt: now,
+            moduleId: "account_research",
+          });
+        });
+      }
+      if (Array.isArray(dossier.technology_stack)) {
+        const techs = dossier.technology_stack.map((t: any) => typeof t === "string" ? t : t.name).filter(Boolean);
+        if (techs.length > 0) {
+          items.push({
+            id: "ev_tech_0",
+            claim: `Detected active technology stack components: ${techs.join(", ")}`,
+            sourceName: "Tech Stack Intelligence",
+            confidence: "high",
+            collectedAt: now,
+            moduleId: "account_research",
+          });
+        }
+      }
+      if (items.length > 0) {
+        return items;
+      }
+    }
+  } catch {
+    // Fallback
+  }
   return latency(mock.evidenceByAccount[accountId] ?? []);
 }
 
 export async function getIcpFitForAccount(accountId: string): Promise<IcpCriterionScore[]> {
+  try {
+    const res = await apiFetch(`/api/fit/${accountId}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.dimensions) && data.dimensions.length > 0) {
+        return data.dimensions.map((d: any) => {
+          const score = typeof d.score === "number" ? d.score : 75;
+          return {
+            criterion: d.criterion_name || d.dimension || "Fit Dimension",
+            weight: 1.0,
+            score,
+            confidence: (score >= 80 ? "high" : score >= 50 ? "medium" : "low") as any,
+            evidenceIds: [],
+          };
+        });
+      }
+    }
+  } catch {
+    // Fallback
+  }
   return latency(mock.icpFitByAccount[accountId] ?? []);
 }
 
@@ -925,6 +998,169 @@ export async function uploadICPDocument(file: File, productId?: string, companyI
     },
   }, 800);
 }
+
+// ── Modular Workflow APIs (Modules 02 to 06) ─────────────────────────
+
+export async function runDiscovery(params: {
+  icp?: any;
+  icpId?: string;
+  productId?: string;
+  companyId?: string;
+}): Promise<Account[]> {
+  let productId = params.productId;
+  let companyId = params.companyId;
+  if (!productId) {
+    try {
+      const prods = await getProducts();
+      productId = prods.activeProductId || undefined;
+      companyId = prods.company?.id || undefined;
+    } catch {
+      // ignore
+    }
+  }
+
+  const res = await apiFetch("/api/discovery/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      icp: params.icp,
+      icp_id: params.icpId,
+      product_id: productId,
+      company_id: companyId,
+      save_to_db: true,
+    }),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Account discovery failed: ${errText}`);
+  }
+
+  const data = await res.json();
+  if (Array.isArray(data.accounts)) {
+    return data.accounts.map((a: any) => {
+      const score = typeof a.fit_score === "number" ? a.fit_score : 0;
+      return {
+        id: a.id || `acc_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+        name: a.name || a.company_name,
+        domain: a.domain,
+        industry: a.industry || "Technology",
+        employeeRange: a.employee_count ? `${a.employee_count}` : "250-1000",
+        hqLocation: a.region || a.location || "North America",
+        logoInitial: (a.name || a.company_name || "A")[0].toUpperCase(),
+        stage: a.stage || "discovered",
+        health: "on_track" as const,
+        fitScore: score,
+        confidence: (score >= 80 ? "high" : score >= 60 ? "medium" : "low") as Account["confidence"],
+        icpId: params.icpId || "",
+        icpName: params.icp?.icpName || "",
+        daysInStage: 0,
+        discoveredAt: a.created_at || new Date().toISOString(),
+        lastActivityAt: a.updated_at || new Date().toISOString(),
+        discoveryReasons: a.match_reasons || [],
+        tags: [],
+      };
+    });
+  }
+  return [];
+}
+
+export async function verifyAccount(accountId: string): Promise<any> {
+  const res = await apiFetch(`/api/verification/${accountId}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Verification failed: ${errText}`);
+  }
+  return await res.json();
+}
+
+export async function evaluateAccountFit(accountId: string): Promise<any> {
+  const res = await apiFetch(`/api/fit/${accountId}/evaluate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Fit evaluation failed: ${errText}`);
+  }
+  return await res.json();
+}
+
+export async function identifyBuyers(accountId: string): Promise<Buyer[]> {
+  const res = await apiFetch(`/api/buyers/${accountId}/identify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Buyer identification failed: ${errText}`);
+  }
+  const data = await res.json();
+  if (Array.isArray(data.buyers)) {
+    return data.buyers.map((b: any) => ({
+      id: b.id,
+      accountId: accountId,
+      name: b.name || b.full_name,
+      title: b.title || b.job_title,
+      seniority: (b.seniority || b.seniority_level || "Director") as Buyer["seniority"],
+      relevanceScore: 85,
+      email: b.email,
+      linkedinUrl: b.linkedin_url,
+      engagementState: "not_contacted" as const,
+    }));
+  }
+  return [];
+}
+
+export async function researchAccount(accountId: string): Promise<any> {
+  const res = await apiFetch(`/api/account-understanding/${accountId}/research`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Account research failed: ${errText}`);
+  }
+  return await res.json();
+}
+
+export async function getAccountDossier(accountId: string): Promise<any | null> {
+  try {
+    const res = await apiFetch(`/api/account-understanding/${accountId}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.status === "success" && data.dossier) {
+        return data.dossier;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return null;
+}
+
+export async function advanceAccountWorkflow(accountId: string, targetStep = "next"): Promise<any> {
+  const res = await apiFetch(`/api/workflow/${accountId}/advance`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_step: targetStep }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Workflow advancement failed: ${errText}`);
+  }
+  return await res.json();
+}
+
 
 
 

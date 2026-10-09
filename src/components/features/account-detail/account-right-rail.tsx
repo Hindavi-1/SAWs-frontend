@@ -5,41 +5,95 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Account, FunnelStage } from "@/lib/types";
 import { FUNNEL_STAGES, STAGE_LABELS } from "@/lib/types";
-import { Sparkles, ArrowRight, CheckCircle2, Circle } from "lucide-react";
+import { Sparkles, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/toaster";
 import Link from "next/link";
+import * as api from "@/lib/api";
 
 interface AccountRightRailProps {
   account: Account;
+  onAccountUpdated?: () => void;
 }
 
-export function AccountRightRail({ account }: AccountRightRailProps) {
-  const [actionAccepted, setActionAccepted] = React.useState(false);
+export function AccountRightRail({ account, onAccountUpdated }: AccountRightRailProps) {
+  const [advancing, setAdvancing] = React.useState(false);
 
-  const recommendedAction =
-    account.health === "stalled"
-      ? {
-          title: "Send re-engagement",
-          description: `${account.daysInStage} days stalled. Reference recent news or exec change at ${account.name} to revive interest.`,
-          cta: "Create Sequence",
-        }
-      : account.stage === "engaged"
-      ? {
-          title: "Schedule discovery call",
-          description: `Buyer is engaged. Strike while warm — coordinate a 30-min call with the primary champion.`,
-          cta: "Draft Invite",
-        }
-      : {
-          title: `Advance to ${STAGE_LABELS[nextStage(account.stage) as FunnelStage]}`,
-          description: `Evidence and fit scoring support progression. Agent confidence is high.`,
-          cta: "Advance Stage",
-        };
+  const getRecommendedAction = () => {
+    if (account.stage === "discovered" || account.verificationStatus !== "verified") {
+      return {
+        title: "Verify Account (M03)",
+        description: `Verify domain resolution, corporate identity, and operations for ${account.name}.`,
+        cta: "Run Verification",
+        step: "verify",
+      };
+    }
+    if (account.stage === "verified") {
+      return {
+        title: "Evaluate ICP Fit (M04)",
+        description: `Score ${account.name} across multi-dimensional criteria against the target ICP.`,
+        cta: "Score ICP Fit",
+        step: "fit",
+      };
+    }
+    if (account.stage === "researched") {
+      return {
+        title: "Identify Buyers (M05)",
+        description: `Find economic buyers, decision-makers, and verified work emails at ${account.name}.`,
+        cta: "Identify Buyers",
+        step: "buyers",
+      };
+    }
+    if (account.stage === "buyer_identified") {
+      return {
+        title: "Deep Account Dossier (M06)",
+        description: `Conduct deep qualitative research, pain point mapping, and news signal analysis.`,
+        cta: "Build Dossier",
+        step: "research",
+      };
+    }
+    if (account.stage === "outreach_ready") {
+      return {
+        title: "Review Outreach Sequences",
+        description: `Personalized sequence drafted for key buyers. Ready to review and send.`,
+        cta: "Review Drafts",
+        step: "outreach",
+        link: "/outreach-review",
+      };
+    }
+    if (account.health === "stalled") {
+      return {
+        title: "Send re-engagement",
+        description: `${account.daysInStage} days stalled. Reference recent news or exec change at ${account.name} to revive interest.`,
+        cta: "Re-engage Account",
+        step: "research",
+      };
+    }
+    return {
+      title: `Advance to ${STAGE_LABELS[nextStage(account.stage) as FunnelStage] ?? "Next Stage"}`,
+      description: `Run the next autonomous pipeline stage for ${account.name}.`,
+      cta: "Advance Stage",
+      step: "next",
+    };
+  };
 
-  const handleAccept = () => {
-    setActionAccepted(true);
-    toast.success("Action accepted", {
-      description: `Agent will execute: "${recommendedAction.title}" for ${account.name}`,
-    });
+  const recommendedAction = getRecommendedAction();
+
+  const handleAdvance = async () => {
+    setAdvancing(true);
+    try {
+      await api.advanceAccountWorkflow(account.id, recommendedAction.step);
+      toast.success("Stage advanced", {
+        description: `${account.name} successfully processed through ${recommendedAction.title}.`,
+      });
+      onAccountUpdated?.();
+    } catch (err: any) {
+      console.error("Advance failed:", err);
+      toast.error("Advance failed", {
+        description: err?.message || "Could not advance this account. Check backend logs.",
+      });
+    } finally {
+      setAdvancing(false);
+    }
   };
 
   const currentStageIdx = FUNNEL_STAGES.indexOf(account.stage);
@@ -54,19 +108,17 @@ export function AccountRightRail({ account }: AccountRightRailProps) {
         </div>
         <p className="text-sm font-bold text-text-primary mb-1">{recommendedAction.title}</p>
         <p className="text-xs text-text-secondary leading-relaxed mb-4">{recommendedAction.description}</p>
-        {!actionAccepted ? (
-          <div className="flex gap-2">
-            <Button size="sm" onClick={handleAccept} className="flex-1">
-              {recommendedAction.cta} <ArrowRight className="h-3.5 w-3.5" />
-            </Button>
-            <Button size="sm" variant="ghost">Skip</Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 text-xs text-positive-600 font-medium">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            Action queued for agent execution
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button size="sm" onClick={handleAdvance} disabled={advancing} className="flex-1">
+            {advancing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ArrowRight className="h-3.5 w-3.5" />
+            )}
+            {advancing ? "Running…" : recommendedAction.cta}
+          </Button>
+          <Button size="sm" variant="ghost">Skip</Button>
+        </div>
       </Card>
 
       {/* Funnel stage stepper */}

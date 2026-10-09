@@ -110,6 +110,7 @@ export interface Account {
   ownerName?: string;
   discoveryReasons: string[];
   tags: string[];
+  verificationStatus?: string;
 }
 
 export interface EvidenceItem {
@@ -512,3 +513,22 @@ export interface SaveICPInput {
   criteria: Record<string, any>;
   rawDocumentText?: string;
 }
+
+export interface AccountDossier {
+  account_id: string;
+  company_overview: string;
+  business_model?: string;
+  employee_count_estimate?: string;
+  revenue_estimate?: string;
+  funding_stage?: string;
+  recent_news_signals?: Array<{ headline: string; date?: string; source?: string; summary?: string; url?: string }>;
+  technology_stack?: Array<{ category?: string; name: string } | string>;
+  pain_points?: Array<{ description: string; impact?: string } | string>;
+  competitive_landscape?: Array<any>;
+  talking_points?: Array<string>;
+  objection_handlers?: Array<{ objection: string; handler: string } | string>;
+  recommended_outreach_angle?: string;
+  account_priority_score?: number;
+  research_confidence?: number;
+}
+

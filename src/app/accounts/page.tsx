@@ -229,6 +229,7 @@ function AccountsPageInner() {
         account={peekAccount}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
+        onAccountUpdated={loadAccounts}
       />
     </div>
   );
