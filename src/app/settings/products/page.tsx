@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
@@ -284,7 +285,8 @@ export default function ProductsSettingsPage() {
       </div>
 
       {/* Modal 1: Quick Add Product */}
-      {isAddOpen && (
+      {isAddOpen && typeof document !== "undefined" &&
+        createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
           <Card className="w-full max-w-lg border-border-subtle bg-raised p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-border-subtle pb-3">
@@ -359,11 +361,13 @@ export default function ProductsSettingsPage() {
               </div>
             </form>
           </Card>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal 2: Pop-Up Screen for Auto Discovery Prompt */}
-      {createdProductForModal && (
+      {createdProductForModal && typeof document !== "undefined" &&
+        createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
           <Card className="w-full max-w-lg border-accent-500/40 bg-raised p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3.5">
@@ -403,7 +407,8 @@ export default function ProductsSettingsPage() {
               </Button>
             </div>
           </Card>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,8 +41,8 @@ export default function OnboardingPage() {
   const [createdProductForModal, setCreatedProductForModal] = React.useState<any>(null);
 
   // Step 1: Product Definition State
-  const [companyName, setCompanyName] = React.useState("Acme Enterprise Solutions");
-  const [companyDomain, setCompanyDomain] = React.useState("acme.com");
+  const [companyName, setCompanyName] = React.useState("");
+  const [companyDomain, setCompanyDomain] = React.useState("");
   const [productName, setProductName] = React.useState("");
   const [productDescription, setProductDescription] = React.useState("");
   const [targetMarket, setTargetMarket] = React.useState("");
@@ -883,7 +884,8 @@ export default function OnboardingPage() {
       )}
 
       {/* Pop-Up Modal Screen for Auto ICP Extraction & Discovery */}
-      {createdProductForModal && (
+      {createdProductForModal && typeof document !== "undefined" &&
+        createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
           <Card className="w-full max-w-lg border-accent-500/40 bg-raised p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3.5">
@@ -923,7 +925,8 @@ export default function OnboardingPage() {
               </Button>
             </div>
           </Card>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
