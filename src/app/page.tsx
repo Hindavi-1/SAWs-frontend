@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { FunnelBar } from "@/components/features/funnel-bar";
 import { MetricCard } from "@/components/features/metric-card";
 import { AgentActivityFeed } from "@/components/features/agent-activity-feed";
@@ -30,12 +31,142 @@ import Link from "next/link";
 
 const REFRESH_INTERVAL_MS = 30_000; // 30 seconds
 
+function RegisterProductScreen({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = React.useState("");
+  const [description, setDescription] = React.useState("");
+  const [targetMarket, setTargetMarket] = React.useState("");
+  const [valueProposition, setValueProposition] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !description.trim()) {
+      setError("Product name and description are required.");
+      return;
+    }
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await api.createProduct({
+        name: name.trim(),
+        description: description.trim(),
+        targetMarket: targetMarket.trim(),
+        valueProposition: valueProposition.trim(),
+        setAsActive: true,
+      });
+      window.dispatchEvent(new Event("sawf_product_updated"));
+      onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create product");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const inputClass =
+    "w-full rounded-lg border border-border-subtle bg-sunken px-3.5 py-2 text-xs text-text-primary outline-none focus:border-accent-500/40";
+
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center py-6">
+      <Card className="w-full max-w-xl">
+        <CardHeader>
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent-500/30 bg-accent-500/10 text-accent-500">
+              <Package className="h-5 w-5" />
+            </span>
+            <div>
+              <CardTitle>Register your first product</CardTitle>
+              <CardDescription className="mt-1">
+                No products have been registered yet. Add a product to unlock account discovery,
+                ICP generation, and outreach for your workspace.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="product-name" className="text-[11px] font-semibold text-text-secondary">
+                Product name <span className="text-risk-500">*</span>
+              </label>
+              <input
+                id="product-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Enterprise Security Suite"
+                className={inputClass}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="product-description" className="text-[11px] font-semibold text-text-secondary">
+                Product description <span className="text-risk-500">*</span>
+              </label>
+              <textarea
+                id="product-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What does it do, which pain points does it solve, and what outcomes does it deliver?"
+                className={`${inputClass} h-24 resize-y`}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="product-target" className="text-[11px] font-semibold text-text-secondary">
+                  Target market
+                </label>
+                <input
+                  id="product-target"
+                  value={targetMarket}
+                  onChange={(e) => setTargetMarket(e.target.value)}
+                  placeholder="e.g. Mid-Market Fintech"
+                  className={inputClass}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="product-value" className="text-[11px] font-semibold text-text-secondary">
+                  Value proposition
+                </label>
+                <input
+                  id="product-value"
+                  value={valueProposition}
+                  onChange={(e) => setValueProposition(e.target.value)}
+                  placeholder="e.g. 85% risk reduction"
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            {error && <p className="text-xs text-risk-500">{error}</p>}
+
+            <Button type="submit" disabled={isSubmitting} className="w-full gap-2">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              <span>Create product &amp; open dashboard</span>
+            </Button>
+          </form>
+
+          <p className="mt-3 text-[11px] text-text-tertiary">
+            Need more options?{" "}
+            <Link href="/settings/products" className="text-accent-500 hover:underline">
+              Open product settings
+            </Link>
+            .
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [metrics, setMetrics] = React.useState<DashboardMetrics | null>(null);
   const [approvals, setApprovals] = React.useState<ApprovalItem[]>([]);
   const [tasks, setTasks] = React.useState<AgentTask[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [activeProduct, setActiveProduct] = React.useState<Product | null>(null);
+  const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const loadAll = React.useCallback(async () => {
@@ -51,6 +182,7 @@ export default function DashboardPage() {
       setApprovals(a);
       setTasks(t);
       setAccounts(accts);
+      setProducts(prods.products);
       const active = prods.products.find((p) => p.isSelected) || prods.products[0] || null;
       setActiveProduct(active);
     } catch (err) {
@@ -89,6 +221,10 @@ export default function DashboardPage() {
         </div>
       </div>
     );
+  }
+
+  if (products.length === 0) {
+    return <RegisterProductScreen onCreated={loadAll} />;
   }
 
   const pendingDrafts = approvals.filter((a) => a.kind === "outreach_email");

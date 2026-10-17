@@ -1,17 +1,27 @@
 "use client";
 
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { Bell, Search, Command, Bot } from "lucide-react";
+import { Bell, Search, Command, Bot, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import * as api from "@/lib/api";
+import { initialsFromName } from "@/lib/auth";
+import { useAuth } from "@/components/auth/auth-provider";
 import { CommandPalette } from "@/components/ui/command-palette";
 import { ProductSelector } from "./product-selector";
 
 export function Topbar() {
+  const router = useRouter();
+  const { user, company, logout } = useAuth();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [pendingCount, setPendingCount] = React.useState(0);
   const [runningAgents, setRunningAgents] = React.useState(0);
+
+  const handleLogout = React.useCallback(() => {
+    logout();
+    router.replace("/login");
+  }, [logout, router]);
 
   const loadCounts = React.useCallback(() => {
     Promise.all([api.getApprovalQueue(), api.getAgentTasks()]).then(([queue, tasks]) => {
@@ -96,12 +106,25 @@ export function Topbar() {
           {/* User Profile Avatar */}
           <div className="flex items-center gap-2 pl-1 border-l border-border-subtle">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-500/10 text-accent-600 dark:text-accent-400 font-mono text-xs font-bold ring-1 ring-accent-500/20">
-              PS
+              {user ? initialsFromName(user.full_name) : "?"}
             </div>
             <div className="hidden lg:block text-left text-xs leading-none">
-              <span className="block font-semibold text-text-primary">Priya Shah</span>
-              <span className="text-[10px] text-text-tertiary">Senior SDR</span>
+              <span className="block font-semibold text-text-primary">
+                {user?.full_name ?? "Signed out"}
+              </span>
+              <span className="text-[10px] text-text-tertiary">
+                {company?.name ?? user?.email ?? ""}
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="ml-0.5 flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-border-default text-text-secondary transition-colors hover:bg-sunken hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
           </div>
         </div>
       </header>

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDatabaseDump, type DatabaseDump } from "@/lib/api";
-import { Database, RefreshCw, Search } from "lucide-react";
+import { useAuth } from "@/components/auth/auth-provider";
+import { Database, RefreshCw, Search, ShieldAlert } from "lucide-react";
 
 function formatCell(value: unknown): string {
   if (value === null || value === undefined) return "—";
@@ -15,6 +16,8 @@ function formatCell(value: unknown): string {
 }
 
 export default function DatabaseExplorerPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
   const [dump, setDump] = React.useState<DatabaseDump | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -33,6 +36,7 @@ export default function DatabaseExplorerPage() {
   }, []);
 
   React.useEffect(() => {
+    if (!isAdmin) return;
     let active = true;
     (async () => {
       try {
@@ -49,7 +53,26 @@ export default function DatabaseExplorerPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isAdmin]);
+
+  // Non-admin users get an explicit access-denied state instead of a stuck loader.
+  if (!isAdmin) {
+    return (
+      <div>
+        <PageHeader
+          eyebrow="Debug"
+          title="Database Explorer"
+          description="Read-only snapshot of every table in the connected PostgreSQL database. This page is restricted to admin users."
+        />
+        <Card className="border-border-strong">
+          <CardContent className="flex items-center gap-2 text-xs text-risk-500">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            Access denied — you must be signed in as an administrator to view the database.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const tables = dump?.tables ?? {};
   const totalRows = Object.values(tables).reduce((sum, rows) => sum + rows.length, 0);
@@ -60,7 +83,7 @@ export default function DatabaseExplorerPage() {
       <PageHeader
         eyebrow="Debug"
         title="Database Explorer"
-        description="Read-only snapshot of every table in the connected PostgreSQL database. This page is intentionally hidden from the navigation — open it directly at /database."
+        description="Read-only snapshot of every table in the connected PostgreSQL database, restricted to admin users. This page is intentionally hidden from the navigation — open it directly at /database."
         actions={
           <Button variant="secondary" size="sm" onClick={refresh} loading={isLoading}>
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
@@ -68,27 +91,32 @@ export default function DatabaseExplorerPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Badge signal={dump?.connected ? "positive" : "risk"} dot>
-          {dump?.connected ? "PostgreSQL connected" : isLoading ? "Connecting…" : "Not connected"}
-        </Badge>
-        <Badge signal="neutral">{Object.keys(tables).length} tables</Badge>
-        <Badge signal="neutral">{totalRows} rows</Badge>
-        <div className="relative ml-auto w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter rows…"
-            className="h-8 w-full rounded-[var(--radius-sm)] border border-border-default bg-raised pl-8 pr-2.5 text-xs text-text-primary placeholder:text-text-tertiary focus:border-accent-500 focus:outline-none"
-          />
-        </div>
-      </div>
-
       {error && (
         <Card className="border-border-strong">
-          <CardContent className="text-xs text-risk-500">{error}</CardContent>
+          <CardContent className="flex items-center gap-2 text-xs text-risk-500">
+            <ShieldAlert className="h-4 w-4 shrink-0" />
+            {error}
+          </CardContent>
         </Card>
+      )}
+
+      {!error && (
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <Badge signal={dump?.connected ? "positive" : "risk"} dot>
+            {dump?.connected ? "PostgreSQL connected" : isLoading ? "Connecting…" : "Not connected"}
+          </Badge>
+          <Badge signal="neutral">{Object.keys(tables).length} tables</Badge>
+          <Badge signal="neutral">{totalRows} rows</Badge>
+          <div className="relative ml-auto w-full sm:w-64">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter rows…"
+              className="h-8 w-full rounded-[var(--radius-sm)] border border-border-default bg-raised pl-8 pr-2.5 text-xs text-text-primary placeholder:text-text-tertiary focus:border-accent-500 focus:outline-none"
+            />
+          </div>
+        </div>
       )}
 
       {!error && dump && !dump.connected && (

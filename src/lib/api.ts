@@ -8,6 +8,7 @@
  * file, never from `mock-data.ts` directly.
  */
 import * as mock from "./mock-data";
+import { getAuthToken, type AuthCompany, type AuthSession, type AuthUser } from "./auth";
 import type {
   Account,
   AgentTask,
@@ -567,14 +568,70 @@ const API_BASE =
 
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const fullUrl = `${API_BASE}${path}`;
+  const headers = new Headers(options.headers);
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  const authedOptions: RequestInit = { ...options, headers };
   try {
-    const res = await fetch(fullUrl, options);
+    const res = await fetch(fullUrl, authedOptions);
     return res;
   } catch {
     // If direct backend call fails, try relative proxy
-    return await fetch(path, options);
+    return await fetch(path, authedOptions);
   }
 }
+
+// ── Authentication ──────────────────────────────────────────────────
+
+export interface SignupInput {
+  fullName: string;
+  email: string;
+  password: string;
+  companyName: string;
+  companyDomain?: string;
+}
+
+async function authError(res: Response, fallback: string): Promise<Error> {
+  const body = await res.json().catch(() => null);
+  const detail = body?.detail;
+  const message = typeof detail === "string" ? detail : fallback;
+  return new Error(message);
+}
+
+export async function login(email: string, password: string): Promise<AuthSession> {
+  const res = await apiFetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw await authError(res, `Login failed (${res.status})`);
+  return (await res.json()) as AuthSession;
+}
+
+export async function signup(input: SignupInput): Promise<AuthSession> {
+  const res = await apiFetch("/api/auth/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      full_name: input.fullName,
+      email: input.email,
+      password: input.password,
+      company_name: input.companyName,
+      company_domain: input.companyDomain || "",
+    }),
+  });
+  if (!res.ok) throw await authError(res, `Signup failed (${res.status})`);
+  return (await res.json()) as AuthSession;
+}
+
+export async function getCurrentSession(): Promise<{ user: AuthUser; company: AuthCompany | null } | null> {
+  const res = await apiFetch("/api/auth/me", { cache: "no-store" });
+  if (!res.ok) return null;
+  return (await res.json()) as { user: AuthUser; company: AuthCompany | null };
+}
+
 
 export async function getBackendHealth(): Promise<{ status: string; modules: string[] } | null> {
   try {
@@ -1171,7 +1228,7 @@ export interface DatabaseDump {
 export async function getDatabaseDump(): Promise<DatabaseDump> {
   const res = await apiFetch("/api/admin/database", { cache: "no-store" });
   if (!res.ok) {
-    throw new Error(`Failed to load database dump (${res.status})`);
+    throw await authError(res, `Failed to load database dump (${res.status})`);
   }
   return (await res.json()) as DatabaseDump;
 }
