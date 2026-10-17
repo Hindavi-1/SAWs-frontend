@@ -1161,6 +1161,21 @@ export async function advanceAccountWorkflow(accountId: string, targetStep = "ne
   return await res.json();
 }
 
+// ── Database Explorer (hidden /database debug page) ─────────────────
+
+export interface DatabaseDump {
+  connected: boolean;
+  tables: Record<string, Record<string, unknown>[]>;
+}
+
+export async function getDatabaseDump(): Promise<DatabaseDump> {
+  const res = await apiFetch("/api/admin/database", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Failed to load database dump (${res.status})`);
+  }
+  return (await res.json()) as DatabaseDump;
+}
+
 
 
 
