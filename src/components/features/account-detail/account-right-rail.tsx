@@ -35,7 +35,7 @@ export function AccountRightRail({ account, onAccountUpdated }: AccountRightRail
         step: "fit",
       };
     }
-    if (account.stage === "researched") {
+    if (account.stage === "fit_evaluated") {
       return {
         title: "Identify Buyers (M05)",
         description: `Find economic buyers, decision-makers, and verified work emails at ${account.name}.`,
@@ -49,6 +49,14 @@ export function AccountRightRail({ account, onAccountUpdated }: AccountRightRail
         description: `Conduct deep qualitative research, pain point mapping, and news signal analysis.`,
         cta: "Build Dossier",
         step: "research",
+      };
+    }
+    if (account.stage === "account_researched") {
+      return {
+        title: "Generate Outreach (M07)",
+        description: `Draft personalized multi-channel outreach sequences for key buyers at ${account.name}.`,
+        cta: "Generate Outreach",
+        step: "outreach",
       };
     }
     if (account.stage === "outreach_ready") {

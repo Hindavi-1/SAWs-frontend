@@ -43,8 +43,9 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
 export type FunnelStage =
   | "discovered"
   | "verified"
-  | "researched"
+  | "fit_evaluated"
   | "buyer_identified"
+  | "account_researched"
   | "outreach_ready"
   | "qualified"
   | "engaged"
@@ -54,8 +55,9 @@ export type FunnelStage =
 export const FUNNEL_STAGES: FunnelStage[] = [
   "discovered",
   "verified",
-  "researched",
+  "fit_evaluated",
   "buyer_identified",
+  "account_researched",
   "outreach_ready",
   "qualified",
 ];
@@ -63,8 +65,9 @@ export const FUNNEL_STAGES: FunnelStage[] = [
 export const STAGE_LABELS: Record<FunnelStage, string> = {
   discovered: "Discovered",
   verified: "Verified",
-  researched: "Researched",
+  fit_evaluated: "Fit Evaluated",
   buyer_identified: "Buyer ID'd",
+  account_researched: "Account Researched",
   outreach_ready: "Outreach Ready",
   qualified: "Qualified",
   engaged: "Engaged",
@@ -77,8 +80,9 @@ export const STAGE_LABELS: Record<FunnelStage, string> = {
 export const STAGE_GATED: Record<FunnelStage, boolean> = {
   discovered: false,
   verified: false,
-  researched: false,
+  fit_evaluated: false,
   buyer_identified: false,
+  account_researched: false,
   outreach_ready: true,
   qualified: true,
   engaged: false,
@@ -107,7 +111,6 @@ export interface Account {
   daysInStage: number;
   discoveredAt: string; // ISO date
   lastActivityAt: string; // ISO date
-  ownerName?: string;
   discoveryReasons: string[];
   tags: string[];
   verificationStatus?: string;

@@ -18,6 +18,12 @@ import * as React from "react";
 
 const RUN_STEPS = ["Scanning data sources", "Scoring ICP fit", "Verifying signals", "Ranking results"];
 
+/** Accounts only have a *real* fit score once Fit Evaluation (M04) has run.
+ * Before that the backend value is a discovery-confidence proxy, so we hide it. */
+function hasRealFitScore(account: Account): boolean {
+  return account.stage !== "discovered" && account.stage !== "verified";
+}
+
 export default function DiscoveryPage() {
   return (
     <React.Suspense fallback={null}>
@@ -554,7 +560,18 @@ function DiscoveryPageInner() {
                     <tr key={a.id} className="border-b border-border-subtle last:border-0 hover:bg-sunken">
                       <td className="px-5 py-3 font-medium text-text-primary cursor-pointer" onClick={() => setActiveAccount(a)}>{a.name}</td>
                       <td className="px-3 py-3 text-xs text-text-secondary capitalize">{a.stage.replace("_", " ")}</td>
-                      <td className="px-3 py-3 font-mono">{a.fitScore}</td>
+                      <td className="px-3 py-3 font-mono">
+                        {hasRealFitScore(a) ? (
+                          a.fitScore
+                        ) : (
+                          <span
+                            className="text-text-tertiary"
+                            title="Fit score is computed when the account passes Fit Evaluation (M04)"
+                          >
+                            —
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-3"><ConfidenceBadge level={a.confidence} /></td>
                       <td className="px-3 py-3 text-text-secondary text-xs">{a.discoveryReasons.slice(0, 2).join(", ")}</td>
                       <td className="px-3 py-3">
@@ -583,7 +600,15 @@ function DiscoveryPageInner() {
         {activeAccount && (
           <div className="space-y-5 p-5">
             <div className="flex items-center gap-4">
-              <RadialScore value={activeAccount.fitScore} size={64} label="fit" />
+              {hasRealFitScore(activeAccount) ? (
+                <RadialScore value={activeAccount.fitScore} size={64} label="fit" />
+              ) : (
+                <div className="flex h-[68px] w-[68px] shrink-0 flex-col items-center justify-center rounded-full border border-dashed border-border-default text-center">
+                  <span className="text-[10px] font-semibold leading-tight text-text-tertiary">
+                    Not<br />scored
+                  </span>
+                </div>
+              )}
               <div>
                 <ConfidenceBadge level={activeAccount.confidence} />
                 <p className="mt-1.5 text-xs text-text-tertiary capitalize">

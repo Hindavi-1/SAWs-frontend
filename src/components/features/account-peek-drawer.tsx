@@ -170,10 +170,6 @@ export function AccountPeekDrawer({ account, open, onClose, onAccountUpdated }: 
             <dd className="font-semibold text-text-primary mt-0.5">{account.employeeRange}</dd>
           </div>
           <div>
-            <dt className="text-text-tertiary text-[10px]">Owner</dt>
-            <dd className="font-semibold text-text-primary mt-0.5">{account.ownerName ?? "Unassigned"}</dd>
-          </div>
-          <div>
             <dt className="text-text-tertiary text-[10px]">Days in Stage</dt>
             <dd className="font-semibold text-text-primary mt-0.5 font-mono">{account.daysInStage} days</dd>
           </div>

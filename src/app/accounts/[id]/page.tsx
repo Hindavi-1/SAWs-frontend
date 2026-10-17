@@ -32,11 +32,11 @@ import Link from "next/link";
 
 const TABS = [
   { id: "overview", label: "Overview" },
-  { id: "research", label: "Research" },
-  { id: "buyers", label: "Buyers" },
-  { id: "qualification", label: "Qualification" },
-  { id: "outreach", label: "Outreach" },
   { id: "icp_fit", label: "ICP Fit" },
+  { id: "buyers", label: "Buyers" },
+  { id: "research", label: "Research" },
+  { id: "outreach", label: "Outreach" },
+  { id: "qualification", label: "Qualification" },
   { id: "activity", label: "Agent Trace" },
 ];
 

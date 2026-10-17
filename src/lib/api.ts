@@ -75,7 +75,7 @@ export async function getDashboardMetrics(productId?: string): Promise<Dashboard
   const totalDays = accounts.reduce((acc, curr) => acc + (curr.daysInStage || 0), 0);
   const avgTimeInStageDays = totalAccounts ? Math.round(totalDays / totalAccounts) : 0;
   const agentSuccessRate = totalAccounts ? 100 : 0;
-  const stages = { discovered: 0, researched: 0, buyer_identified: 0, outreach_ready: 0, qualified: 0 };
+  const stages = { discovered: 0, verified: 0, fit_evaluated: 0, buyer_identified: 0, account_researched: 0, outreach_ready: 0, qualified: 0 };
   accounts.forEach((a) => { if (a.stage in stages) stages[a.stage as keyof typeof stages]++; });
   return {
     totalAccounts,
@@ -88,8 +88,10 @@ export async function getDashboardMetrics(productId?: string): Promise<Dashboard
     avgFitScore: totalAccounts ? Math.round(accounts.reduce((s, a) => s + a.fitScore, 0) / totalAccounts) : 0,
     funnel: [
       { stage: "discovered", count: stages.discovered, deltaThisWeek: 0 },
-      { stage: "researched", count: stages.researched, deltaThisWeek: 0 },
+      { stage: "verified", count: stages.verified, deltaThisWeek: 0 },
+      { stage: "fit_evaluated", count: stages.fit_evaluated, deltaThisWeek: 0 },
       { stage: "buyer_identified", count: stages.buyer_identified, deltaThisWeek: 0 },
+      { stage: "account_researched", count: stages.account_researched, deltaThisWeek: 0 },
       { stage: "outreach_ready", count: stages.outreach_ready, deltaThisWeek: 0 },
       { stage: "qualified", count: stages.qualified, deltaThisWeek: 0 },
     ],
@@ -115,14 +117,16 @@ export async function getAccounts(productId?: string): Promise<Account[]> {
             verified: "verified",
             discovered: "discovered",
             rejected: "discovered",
-            researched: "researched",
+            researched: "fit_evaluated",
+            fit_evaluated: "fit_evaluated",
             buyer_identified: "buyer_identified",
+            account_researched: "account_researched",
             outreach_ready: "outreach_ready",
             qualified: "qualified",
           };
           const stage =
-            stageMap[a.verification_status as string] ??
             stageMap[a.stage as string] ??
+            stageMap[a.verification_status as string] ??
             "discovered";
           return {
             id: a.id,
@@ -170,14 +174,16 @@ export async function getAccount(id: string): Promise<Account | undefined> {
           verified: "verified",
           discovered: "discovered",
           rejected: "discovered",
-          researched: "researched",
+          researched: "fit_evaluated",
+          fit_evaluated: "fit_evaluated",
           buyer_identified: "buyer_identified",
+          account_researched: "account_researched",
           outreach_ready: "outreach_ready",
           qualified: "qualified",
         };
         const stage =
-          stageMap[a.verification_status as string] ??
           stageMap[a.stage as string] ??
+          stageMap[a.verification_status as string] ??
           "discovered";
         return {
           id: a.id,
@@ -1085,6 +1091,9 @@ export async function runDiscovery(params: {
       product_id: productId,
       company_id: companyId,
       save_to_db: true,
+      // No-touch automation: newly discovered accounts flow through M03 -> M04
+      // automatically and pause before outreach (human approval gate).
+      auto_advance: true,
     }),
     cache: "no-store",
   });

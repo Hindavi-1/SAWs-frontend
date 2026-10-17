@@ -22,8 +22,8 @@ export function AccountOverviewTab({
   outreach,
 }: AccountOverviewTabProps) {
   const moduleChips = [
-    { label: "Deep Research", done: evidence.length > 0, count: evidence.length, desc: "claims gathered" },
     { label: "Buyer Identification", done: buyers.length > 0, count: buyers.length, desc: "personas verified" },
+    { label: "Deep Research", done: evidence.length > 0, count: evidence.length, desc: "claims gathered" },
     { label: "Qualification", done: qualification.length > 0, count: qualification.filter(q => q.status === "met").length, desc: "criteria met" },
     { label: "Outreach & Engagement", done: outreach.length > 0, count: outreach.length, desc: "sequence touches" },
   ];

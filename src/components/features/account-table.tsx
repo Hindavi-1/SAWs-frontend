@@ -110,13 +110,6 @@ export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
             <Button
               size="xs"
               variant="secondary"
-              onClick={() => handleBulkAction("Assign Owner")}
-            >
-              Assign Owner
-            </Button>
-            <Button
-              size="xs"
-              variant="secondary"
               onClick={() => handleBulkAction("Advance Funnel Stage")}
             >
               Advance Stage
@@ -183,7 +176,6 @@ export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
                 <span>In Stage</span>
                 <SortIcon field="daysInStage" />
               </th>
-              <th className="px-3 py-2.5">Owner</th>
               <th
                 className="px-4 py-2.5 cursor-pointer hover:text-text-primary text-right"
                 onClick={() => toggleSort("discoveredAt")}
@@ -269,11 +261,6 @@ export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
                   {/* In Stage */}
                   <td className="px-3 py-2.5 font-mono text-text-secondary">
                     {a.daysInStage}d
-                  </td>
-
-                  {/* Owner */}
-                  <td className="px-3 py-2.5 text-text-secondary truncate max-w-[120px]">
-                    {a.ownerName || "Unassigned"}
                   </td>
 
                   {/* Discovered */}

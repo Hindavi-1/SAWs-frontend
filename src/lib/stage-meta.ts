@@ -28,13 +28,14 @@ export const HEALTH_META: Record<AccountHealth, { label: string; signal: keyof t
 export const STAGE_RAMP: Record<FunnelStage, number> = {
   discovered: 1,
   verified: 2,
-  qualified: 3,
+  fit_evaluated: 3,
   buyer_identified: 4,
-  researched: 5,
+  account_researched: 5,
   outreach_ready: 6,
-  engaged: 7,
-  nurture: 8,
-  next_action: 8,
+  qualified: 7,
+  engaged: 8,
+  nurture: 9,
+  next_action: 9,
 };
 
 export const MODULE_SHORT: Record<ModuleId, string> = {

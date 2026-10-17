@@ -1,7 +1,6 @@
 "use client";
 
 import { ConfidenceBadge } from "@/components/ui/badge";
-import { RadialScore } from "@/components/ui/radial-score";
 import type { Account } from "@/lib/types";
 import { STAGE_LABELS } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -22,7 +21,6 @@ export function AccountCard({ account, onOpen }: { account: Account; onOpen: (ac
             <p className="truncate text-xs text-text-tertiary">{account.industry} · {account.employeeRange}</p>
           </div>
         </div>
-        <RadialScore value={account.fitScore} size={44} strokeWidth={4} />
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
