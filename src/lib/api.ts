@@ -34,6 +34,7 @@ import type {
   GenerateICPInput,
   SaveICPInput,
 } from "./types";
+import { FUNNEL_STAGES, reachedStageCount } from "./types";
 
 const latency = <T,>(value: T, ms = 0): Promise<T> =>
   ms > 0 ? new Promise((resolve) => setTimeout(() => resolve(value), ms)) : Promise.resolve(value);
@@ -75,8 +76,12 @@ export async function getDashboardMetrics(productId?: string): Promise<Dashboard
   const totalDays = accounts.reduce((acc, curr) => acc + (curr.daysInStage || 0), 0);
   const avgTimeInStageDays = totalAccounts ? Math.round(totalDays / totalAccounts) : 0;
   const agentSuccessRate = totalAccounts ? 100 : 0;
-  const stages = { discovered: 0, verified: 0, fit_evaluated: 0, buyer_identified: 0, account_researched: 0, outreach_ready: 0, qualified: 0 };
-  accounts.forEach((a) => { if (a.stage in stages) stages[a.stage as keyof typeof stages]++; });
+  // Cumulative funnel: each stage counts accounts that reached it or beyond.
+  const funnel = FUNNEL_STAGES.map((stage) => ({
+    stage,
+    count: reachedStageCount(accounts, stage),
+    deltaThisWeek: 0,
+  }));
   return {
     totalAccounts,
     activeDiscoveryRuns: 0,
@@ -86,15 +91,7 @@ export async function getDashboardMetrics(productId?: string): Promise<Dashboard
     pendingOutreachDrafts: 0,
     buyersIdentified: 0,
     avgFitScore: totalAccounts ? Math.round(accounts.reduce((s, a) => s + a.fitScore, 0) / totalAccounts) : 0,
-    funnel: [
-      { stage: "discovered", count: stages.discovered, deltaThisWeek: 0 },
-      { stage: "verified", count: stages.verified, deltaThisWeek: 0 },
-      { stage: "fit_evaluated", count: stages.fit_evaluated, deltaThisWeek: 0 },
-      { stage: "buyer_identified", count: stages.buyer_identified, deltaThisWeek: 0 },
-      { stage: "account_researched", count: stages.account_researched, deltaThisWeek: 0 },
-      { stage: "outreach_ready", count: stages.outreach_ready, deltaThisWeek: 0 },
-      { stage: "qualified", count: stages.qualified, deltaThisWeek: 0 },
-    ],
+    funnel,
   };
 }
 

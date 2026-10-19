@@ -62,6 +62,25 @@ export const FUNNEL_STAGES: FunnelStage[] = [
   "qualified",
 ];
 
+/** Position of a stage in the linear funnel (higher = further along). */
+export function stageRank(stage: FunnelStage): number {
+  const i = FUNNEL_STAGES.indexOf(stage);
+  return i === -1 ? 0 : i;
+}
+
+/**
+ * Funnel counts are cumulative: each stage counts every account that reached it
+ * *or beyond*, so counts are monotonically non-increasing down the funnel
+ * (Discovered >= Verified >= Fit Evaluated >= ...).
+ */
+export function reachedStageCount(
+  accounts: { stage: FunnelStage }[],
+  stage: FunnelStage,
+): number {
+  const r = stageRank(stage);
+  return accounts.filter((a) => stageRank(a.stage) >= r).length;
+}
+
 export const STAGE_LABELS: Record<FunnelStage, string> = {
   discovered: "Discovered",
   verified: "Verified",

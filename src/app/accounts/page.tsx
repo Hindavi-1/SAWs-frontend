@@ -7,7 +7,7 @@ import { AccountPeekDrawer } from "@/components/features/account-peek-drawer";
 import { HealthBadge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
 import type { Account, FunnelStage } from "@/lib/types";
-import { FUNNEL_STAGES, STAGE_LABELS } from "@/lib/types";
+import { FUNNEL_STAGES, STAGE_LABELS, reachedStageCount, stageRank } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Kanban, List, Search, Filter, Sparkles, Building2, AlertCircle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -62,8 +62,9 @@ function AccountsPageInner() {
   // Filter pipeline
   const filtered = React.useMemo(() => {
     return accounts.filter((a) => {
-      // Stage filter
-      if (stageFilter !== "all" && a.stage !== stageFilter) {
+      // Stage filter — "reached this stage or beyond", matching the cumulative
+      // funnel so the chip count always equals the number of rows shown.
+      if (stageFilter !== "all" && stageRank(a.stage) < stageRank(stageFilter)) {
         return false;
       }
 
@@ -161,7 +162,7 @@ function AccountsPageInner() {
         <span className="text-[11px] text-text-tertiary font-medium mr-1">Stage:</span>
         <FilterChip label="All stages" count={accounts.length} active={stageFilter === "all"} onClick={() => setStageOverride("all")} />
         {FUNNEL_STAGES.map((s) => {
-          const count = accounts.filter((a) => a.stage === s).length;
+          const count = reachedStageCount(accounts, s);
           return (
             <FilterChip
               key={s}

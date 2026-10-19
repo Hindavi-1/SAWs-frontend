@@ -59,7 +59,9 @@ export function FunnelBar({ data }: { data: FunnelStageCount[] }) {
   const ordered = FUNNEL_STAGES.map(
     (stage) => data.find((d) => d.stage === stage) ?? { stage, count: 0, deltaThisWeek: 0 }
   );
-  const total = Math.max(ordered.reduce((sum, d) => sum + d.count, 0), 1);
+  // Counts are cumulative, so the first stage (Discovered) already contains
+  // every account — use it as the funnel total instead of summing stages.
+  const total = Math.max(ordered[0]?.count ?? 0, 1);
   const maxCount = Math.max(...ordered.map((d) => d.count), 1);
 
   const conversions = ordered.map((d, i) => {
