@@ -109,13 +109,6 @@ export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
           <div className="flex items-center gap-2">
             <Button
               size="xs"
-              variant="secondary"
-              onClick={() => handleBulkAction("Advance Funnel Stage")}
-            >
-              Advance Stage
-            </Button>
-            <Button
-              size="xs"
               variant="primary"
               onClick={() => handleBulkAction("Queue Outreach Sequences")}
             >

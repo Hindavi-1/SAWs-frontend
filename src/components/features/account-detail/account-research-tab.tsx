@@ -112,21 +112,19 @@ export function AccountResearchTab({
           </div>
 
           <Button
-            size="sm"
+            size="xs"
+            variant="ghost"
             onClick={handleRunResearch}
             disabled={isResearching}
-            className="shrink-0"
+            className="shrink-0 text-text-tertiary hover:text-text-primary"
+            title="Only needed if the generated dossier looks wrong"
           >
             {isResearching ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <Sparkles className="h-3.5 w-3.5" />
+              <Sparkles className="h-3 w-3" />
             )}
-            {isResearching
-              ? "Synthesizing Dossier…"
-              : hasDossier
-              ? "Refresh Intelligence (M06)"
-              : "Run Deep Research (M06)"}
+            {isResearching ? "Synthesizing…" : "Re-run research"}
           </Button>
         </div>
       </Card>
@@ -137,16 +135,9 @@ export function AccountResearchTab({
           <Building2 className="mx-auto h-8 w-8 text-text-tertiary mb-2 opacity-50" />
           <p className="text-sm font-medium text-text-primary">No Intelligence Dossier Generated Yet</p>
           <p className="text-xs text-text-tertiary mt-1 max-w-md mx-auto">
-            Run Module 06 Account Understanding to gather recent news, identify operational pain points, map tech stack infrastructure, and formulate talking points.
+            The M06 dossier (company overview, pain points, tech stack, news signals, and talking
+            points) is built automatically once the pipeline reaches Account Research.
           </p>
-          <Button size="sm" className="mt-4" onClick={handleRunResearch} disabled={isResearching}>
-            {isResearching ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
-            Run Deep Research (M06)
-          </Button>
         </Card>
       )}
 

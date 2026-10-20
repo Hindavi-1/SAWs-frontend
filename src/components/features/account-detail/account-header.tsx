@@ -6,70 +6,14 @@ import { RadialScore } from "@/components/ui/radial-score";
 import { StageBadge, HealthBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Account } from "@/lib/types";
-import { ExternalLink, Sparkles, Send, Loader2, CheckCircle2 } from "lucide-react";
-import { toast } from "@/components/ui/toaster";
-import * as api from "@/lib/api";
+import { ExternalLink, Send } from "lucide-react";
 
 interface AccountHeaderProps {
   account: Account;
   pendingDraftCount: number;
-  onAccountUpdated?: () => void;
 }
 
-const PIPELINE_STEPS: { key: string; label: string }[] = [
-  { key: "verify", label: "Verifying account…" },
-  { key: "fit", label: "Evaluating ICP fit…" },
-  { key: "buyers", label: "Identifying buyers…" },
-  { key: "research", label: "Researching account…" },
-];
-
-export function AccountHeader({ account, pendingDraftCount, onAccountUpdated }: AccountHeaderProps) {
-  const [isRunning, setIsRunning] = React.useState(false);
-  const [runStep, setRunStep] = React.useState(-1);
-
-  const handleRunPipeline = async () => {
-    setIsRunning(true);
-    setRunStep(0);
-
-    try {
-      toast.info("Pipeline started", {
-        description: `Running M03–M06 pipeline for ${account.name}`,
-      });
-
-      // Advance step-by-step through M03 → M04 → M05 → M06
-      const steps = ["verify", "fit", "buyers", "research"];
-      for (let i = 0; i < steps.length; i++) {
-        setRunStep(i);
-        try {
-          await api.advanceAccountWorkflow(account.id, steps[i]);
-        } catch (stepErr) {
-          // Some steps may fail (e.g. no ICP), continue others
-          console.warn(`Step ${steps[i]} failed:`, stepErr);
-        }
-      }
-
-      toast.success("Pipeline complete", {
-        description: `${account.name} fully processed through M03–M06.`,
-      });
-
-      // Notify parent to reload account data
-      onAccountUpdated?.();
-    } catch (err) {
-      console.error("Pipeline run failed:", err);
-      toast.error("Pipeline failed", {
-        description: `Could not run pipeline for ${account.name}. Check backend logs.`,
-      });
-    } finally {
-      setIsRunning(false);
-      setRunStep(-1);
-    }
-  };
-
-  const currentStepLabel =
-    isRunning && runStep >= 0 && runStep < PIPELINE_STEPS.length
-      ? PIPELINE_STEPS[runStep].label
-      : "Run AI Pipeline";
-
+export function AccountHeader({ account, pendingDraftCount }: AccountHeaderProps) {
   return (
     <div className="rounded-[var(--radius-md)] border border-border-default bg-raised p-4 sm:p-5 shadow-xs">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -114,61 +58,16 @@ export function AccountHeader({ account, pendingDraftCount, onAccountUpdated }: 
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            {pendingDraftCount > 0 && (
-              <Link href="/outreach-review">
-                <Button size="sm" className="bg-agent-core hover:bg-agent-core/90 text-white shadow-xs">
-                  <Send className="h-3.5 w-3.5" />
-                  Review Drafts ({pendingDraftCount})
-                </Button>
-              </Link>
-            )}
-
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleRunPipeline}
-              disabled={isRunning}
-            >
-              {isRunning ? (
-                <Loader2 className="h-3.5 w-3.5 text-agent-core animate-spin" />
-              ) : (
-                <Sparkles className="h-3.5 w-3.5 text-agent-core" />
-              )}
-              {currentStepLabel}
-            </Button>
-          </div>
+          {pendingDraftCount > 0 && (
+            <Link href="/outreach-review">
+              <Button size="sm" className="bg-agent-core hover:bg-agent-core/90 text-white shadow-xs">
+                <Send className="h-3.5 w-3.5" />
+                Review Drafts ({pendingDraftCount})
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
-
-      {/* Pipeline progress strip (visible while running) */}
-      {isRunning && (
-        <div className="mt-3 pt-3 border-t border-border-subtle">
-          <div className="flex items-center gap-3 overflow-x-auto">
-            {PIPELINE_STEPS.map((step, idx) => (
-              <div key={step.key} className="flex items-center gap-1.5 shrink-0">
-                {idx < runStep ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-positive-500" />
-                ) : idx === runStep ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-accent-500" />
-                ) : (
-                  <span className="h-3.5 w-3.5 rounded-full border border-border-default inline-block" />
-                )}
-                <span
-                  className={`text-[11px] font-medium ${
-                    idx <= runStep ? "text-text-primary" : "text-text-tertiary"
-                  }`}
-                >
-                  {step.label.replace("…", "")}
-                </span>
-                {idx < PIPELINE_STEPS.length - 1 && (
-                  <span className="text-border-subtle mx-1">→</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

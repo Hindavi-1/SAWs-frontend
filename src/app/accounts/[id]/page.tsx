@@ -112,7 +112,6 @@ export default function AccountDetailPage() {
       <AccountHeader
         account={account}
         pendingDraftCount={pendingDraftCount}
-        onAccountUpdated={handleAccountUpdated}
       />
 
       {/* 3-column layout: Tabs+Content | Right Rail */}
@@ -225,13 +224,23 @@ function IcpFitTab({
     return (
       <Card className="p-8 text-center text-sm border-border-default space-y-3">
         <p className="text-text-tertiary">ICP fit has not been scored for this account yet.</p>
-        <Button size="sm" onClick={handleEvaluate} disabled={evaluating}>
+        <p className="text-[11px] text-text-tertiary">
+          Fit evaluation (M04) runs automatically as part of the pipeline after verification.
+        </p>
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={handleEvaluate}
+          disabled={evaluating}
+          className="text-text-tertiary hover:text-text-primary"
+          title="Only needed if the scored dimensions look wrong"
+        >
           {evaluating ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <Sparkles className="h-3.5 w-3.5" />
+            <Sparkles className="h-3 w-3" />
           )}
-          {evaluating ? "Evaluating Fit…" : "Run ICP Fit Evaluation (M04)"}
+          {evaluating ? "Evaluating fit…" : "Re-run fit evaluation"}
         </Button>
       </Card>
     );
@@ -245,16 +254,18 @@ function IcpFitTab({
         </p>
         <Button
           size="xs"
-          variant="outline"
+          variant="ghost"
           onClick={handleEvaluate}
           disabled={evaluating}
+          className="text-text-tertiary hover:text-text-primary"
+          title="Only needed if the scored dimensions look wrong"
         >
           {evaluating ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
             <Sparkles className="h-3 w-3" />
           )}
-          {evaluating ? "Scoring…" : "Re-evaluate Fit"}
+          {evaluating ? "Scoring…" : "Re-run"}
         </Button>
       </div>
 

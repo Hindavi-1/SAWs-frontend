@@ -4,13 +4,12 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AccountCard } from "@/components/features/account-card";
+import { AccountPeekDrawer } from "@/components/features/account-peek-drawer";
 import { EvidenceList } from "@/components/features/evidence-list";
-import { Drawer } from "@/components/ui/drawer";
 import { ConfidenceBadge } from "@/components/ui/badge";
-import { RadialScore } from "@/components/ui/radial-score";
 import * as api from "@/lib/api";
 import type { Account, IcpDefinition } from "@/lib/types";
-import { CheckCircle2, Loader2, Play, Sparkles, Table2, LayoutGrid, FileText, UploadCloud, Trash2, FileUp, ArrowRight } from "lucide-react";
+import { CheckCircle2, Loader2, Play, Sparkles, Table2, LayoutGrid, FileText, UploadCloud, Trash2, FileUp } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -50,7 +49,6 @@ function DiscoveryPageInner() {
   const [results, setResults] = React.useState<Account[]>([]);
   const [view, setView] = React.useState<"grid" | "table">("grid");
   const [activeAccount, setActiveAccount] = React.useState<Account | null>(null);
-  const [advancingId, setAdvancingId] = React.useState<string | null>(null);
 
   const loadInitialData = React.useCallback(async () => {
     const loadedIcps = await api.getIcps();
@@ -204,33 +202,6 @@ function DiscoveryPageInner() {
       }
     }
   }
-
-  // Wire "Verify & Advance" to the backend workflow API (M03–M06)
-  const handleVerifyAndAdvance = async (account: Account) => {
-    if (!account.id) return;
-    setAdvancingId(account.id);
-    try {
-      toast.info("Running pipeline…", {
-        description: `Running M03–M06 for ${account.name}`,
-      });
-      await api.advanceAccountWorkflow(account.id, "all");
-      toast.success("Pipeline complete!", {
-        description: `${account.name} advanced through M03–M06.`,
-      });
-      // Refresh list and update drawer
-      const all = await api.getAccounts();
-      setResults(all);
-      const updated = all.find((a) => a.id === account.id);
-      if (updated) setActiveAccount(updated);
-    } catch (err: any) {
-      console.error("Advance failed:", err);
-      toast.error("Pipeline failed", {
-        description: err?.message || "Check backend logs.",
-      });
-    } finally {
-      setAdvancingId(null);
-    }
-  };
 
   const canRun =
     (icpMode === "existing" && !!selectedIcpId) ||
@@ -591,70 +562,11 @@ function DiscoveryPageInner() {
         </>
       )}
 
-      <Drawer
+      <AccountPeekDrawer
+        account={activeAccount}
         open={!!activeAccount}
         onClose={() => setActiveAccount(null)}
-        title={activeAccount?.name ?? ""}
-        description={activeAccount ? `${activeAccount.industry} · ${activeAccount.hqLocation}` : undefined}
-      >
-        {activeAccount && (
-          <div className="space-y-5 p-5">
-            <div className="flex items-center gap-4">
-              {hasRealFitScore(activeAccount) ? (
-                <RadialScore value={activeAccount.fitScore} size={64} label="fit" />
-              ) : (
-                <div className="flex h-[68px] w-[68px] shrink-0 flex-col items-center justify-center rounded-full border border-dashed border-border-default text-center">
-                  <span className="text-[10px] font-semibold leading-tight text-text-tertiary">
-                    Not<br />scored
-                  </span>
-                </div>
-              )}
-              <div>
-                <ConfidenceBadge level={activeAccount.confidence} />
-                <p className="mt-1.5 text-xs text-text-tertiary capitalize">
-                  Stage: <strong className="text-text-secondary">{activeAccount.stage.replace("_", " ")}</strong>
-                </p>
-                <p className="mt-0.5 text-xs text-text-tertiary">Discovered via {activeAccount.icpName || "ICP"}</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-semibold text-text-secondary">Why this account matched</p>
-              <ul className="space-y-1.5">
-                {activeAccount.discoveryReasons.map((r) => (
-                  <li key={r} className="text-sm text-text-primary">· {r}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="flex gap-2 border-t border-border-subtle pt-4 flex-wrap">
-              <Button
-                className="flex-1"
-                disabled={advancingId === activeAccount.id}
-                onClick={() => handleVerifyAndAdvance(activeAccount)}
-              >
-                {advancingId === activeAccount.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3.5 w-3.5" />
-                )}
-                {advancingId === activeAccount.id ? "Running M03–M06…" : "Verify & Advance"}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setActiveAccount(null);
-                  router.push(`/accounts/${activeAccount.id}`);
-                }}
-              >
-                <ArrowRight className="h-3.5 w-3.5" />
-                View Account
-              </Button>
-              <Button variant="ghost">Watchlist</Button>
-            </div>
-          </div>
-        )}
-      </Drawer>
+      />
     </div>
   );
 }

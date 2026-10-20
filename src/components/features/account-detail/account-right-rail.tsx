@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Account, FunnelStage } from "@/lib/types";
 import { FUNNEL_STAGES, STAGE_LABELS } from "@/lib/types";
-import { Sparkles, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { Sparkles, ArrowRight, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "@/components/ui/toaster";
 import Link from "next/link";
 import * as api from "@/lib/api";
@@ -15,89 +15,31 @@ interface AccountRightRailProps {
   onAccountUpdated?: () => void;
 }
 
+// Stages where the M03 -> M06 pipeline runs with zero human input.
+const AUTOMATED_STAGES: FunnelStage[] = [
+  "discovered",
+  "verified",
+  "fit_evaluated",
+  "buyer_identified",
+];
+
 export function AccountRightRail({ account, onAccountUpdated }: AccountRightRailProps) {
   const [advancing, setAdvancing] = React.useState(false);
 
-  const getRecommendedAction = () => {
-    if (account.stage === "discovered" || account.verificationStatus !== "verified") {
-      return {
-        title: "Verify Account (M03)",
-        description: `Verify domain resolution, corporate identity, and operations for ${account.name}.`,
-        cta: "Run Verification",
-        step: "verify",
-      };
-    }
-    if (account.stage === "verified") {
-      return {
-        title: "Evaluate ICP Fit (M04)",
-        description: `Score ${account.name} across multi-dimensional criteria against the target ICP.`,
-        cta: "Score ICP Fit",
-        step: "fit",
-      };
-    }
-    if (account.stage === "fit_evaluated") {
-      return {
-        title: "Identify Buyers (M05)",
-        description: `Find economic buyers, decision-makers, and verified work emails at ${account.name}.`,
-        cta: "Identify Buyers",
-        step: "buyers",
-      };
-    }
-    if (account.stage === "buyer_identified") {
-      return {
-        title: "Deep Account Dossier (M06)",
-        description: `Conduct deep qualitative research, pain point mapping, and news signal analysis.`,
-        cta: "Build Dossier",
-        step: "research",
-      };
-    }
-    if (account.stage === "account_researched") {
-      return {
-        title: "Generate Outreach (M07)",
-        description: `Draft personalized multi-channel outreach sequences for key buyers at ${account.name}.`,
-        cta: "Generate Outreach",
-        step: "outreach",
-      };
-    }
-    if (account.stage === "outreach_ready") {
-      return {
-        title: "Review Outreach Sequences",
-        description: `Personalized sequence drafted for key buyers. Ready to review and send.`,
-        cta: "Review Drafts",
-        step: "outreach",
-        link: "/outreach-review",
-      };
-    }
-    if (account.health === "stalled") {
-      return {
-        title: "Send re-engagement",
-        description: `${account.daysInStage} days stalled. Reference recent news or exec change at ${account.name} to revive interest.`,
-        cta: "Re-engage Account",
-        step: "research",
-      };
-    }
-    return {
-      title: `Advance to ${STAGE_LABELS[nextStage(account.stage) as FunnelStage] ?? "Next Stage"}`,
-      description: `Run the next autonomous pipeline stage for ${account.name}.`,
-      cta: "Advance Stage",
-      step: "next",
-    };
-  };
+  const isAutomated = AUTOMATED_STAGES.includes(account.stage);
 
-  const recommendedAction = getRecommendedAction();
-
-  const handleAdvance = async () => {
+  const handleRerunPipeline = async () => {
     setAdvancing(true);
     try {
-      await api.advanceAccountWorkflow(account.id, recommendedAction.step);
-      toast.success("Stage advanced", {
-        description: `${account.name} successfully processed through ${recommendedAction.title}.`,
+      await api.advanceAccountWorkflow(account.id, "all");
+      toast.success("Pipeline re-run", {
+        description: `${account.name} re-processed through M03–M06.`,
       });
       onAccountUpdated?.();
     } catch (err: any) {
-      console.error("Advance failed:", err);
-      toast.error("Advance failed", {
-        description: err?.message || "Could not advance this account. Check backend logs.",
+      console.error("Pipeline re-run failed:", err);
+      toast.error("Pipeline re-run failed", {
+        description: err?.message || "Could not re-run the pipeline. Check backend logs.",
       });
     } finally {
       setAdvancing(false);
@@ -108,24 +50,38 @@ export function AccountRightRail({ account, onAccountUpdated }: AccountRightRail
 
   return (
     <div className="space-y-4">
-      {/* Next Best Action */}
+      {/* Agent pipeline status */}
       <Card className="p-4 border-agent-border bg-agent-surface/30">
         <div className="flex items-center gap-1.5 mb-3">
           <Sparkles className="h-3.5 w-3.5 text-agent-core" />
-          <p className="text-xs font-semibold text-agent-core">Next Best Action</p>
+          <p className="text-xs font-semibold text-agent-core">Agent Pipeline</p>
         </div>
-        <p className="text-sm font-bold text-text-primary mb-1">{recommendedAction.title}</p>
-        <p className="text-xs text-text-secondary leading-relaxed mb-4">{recommendedAction.description}</p>
-        <div className="flex gap-2">
-          <Button size="sm" onClick={handleAdvance} disabled={advancing} className="flex-1">
+
+        <p className="text-xs text-text-secondary leading-relaxed">
+          {isAutomated
+            ? `${account.name} is being processed automatically. Verification, ICP fit, buyer identification, and account research run without intervention once discovery finds the account.`
+            : `Automation is complete through Account Research. Outreach (M07) requires human approval before any message is sent.`}
+        </p>
+
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-text-tertiary">
+            M03–M06 · automatic
+          </span>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={handleRerunPipeline}
+            disabled={advancing}
+            className="text-text-tertiary hover:text-text-primary"
+            title="Only needed if the generated results look wrong"
+          >
             {advancing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
-              <ArrowRight className="h-3.5 w-3.5" />
+              <RefreshCw className="h-3 w-3" />
             )}
-            {advancing ? "Running…" : recommendedAction.cta}
+            {advancing ? "Running…" : "Re-run"}
           </Button>
-          <Button size="sm" variant="ghost">Skip</Button>
         </div>
       </Card>
 
@@ -197,10 +153,4 @@ export function AccountRightRail({ account, onAccountUpdated }: AccountRightRail
       </Card>
     </div>
   );
-}
-
-function nextStage(current: string): string {
-  const idx = FUNNEL_STAGES.indexOf(current as FunnelStage);
-  if (idx < 0 || idx >= FUNNEL_STAGES.length - 1) return current;
-  return FUNNEL_STAGES[idx + 1];
 }

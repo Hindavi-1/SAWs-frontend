@@ -53,13 +53,23 @@ export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdat
     return (
       <Card className="p-8 text-center border-border-default">
         <p className="text-xs text-text-tertiary">No decision makers identified for this account yet.</p>
-        <Button size="sm" className="mt-3" onClick={handleFindMore} disabled={findingMore}>
+        <p className="mt-1 text-[11px] text-text-tertiary">
+          Buyers and their work emails are discovered automatically once discovery runs through M05.
+        </p>
+        <Button
+          size="xs"
+          variant="ghost"
+          className="mt-3 text-text-tertiary hover:text-text-primary"
+          onClick={handleFindMore}
+          disabled={findingMore}
+          title="Only needed if the identified buyers look wrong"
+        >
           {findingMore ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <Sparkles className="h-3.5 w-3.5" />
+            <Sparkles className="h-3 w-3" />
           )}
-          {findingMore ? "Identifying Buyers..." : "Run Buyer Identification (M05)"}
+          {findingMore ? "Identifying buyers…" : "Re-run buyer identification"}
         </Button>
       </Card>
     );
@@ -72,17 +82,19 @@ export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdat
           Identified Decision Makers & Champions ({buyers.length})
         </p>
         <Button
-          size="sm"
-          variant="outline"
+          size="xs"
+          variant="ghost"
           onClick={handleFindMore}
           disabled={findingMore}
+          className="text-text-tertiary hover:text-text-primary"
+          title="Only needed if the identified buyers look wrong"
         >
           {findingMore ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
-            <UserPlus className="h-3.5 w-3.5" />
+            <UserPlus className="h-3 w-3" />
           )}
-          {findingMore ? "Searching..." : "Find More Buyers"}
+          {findingMore ? "Searching…" : "Re-run"}
         </Button>
       </div>
 
