@@ -168,9 +168,15 @@ export function AccountPeekDrawer({ account, open, onClose }: AccountPeekModalPr
                         <p className="font-semibold text-text-primary text-xs">{b.name}</p>
                         <p className="text-[11px] text-text-tertiary">{b.title} · {b.seniority}</p>
                       </div>
-                      <span className="font-mono text-[10px] text-text-tertiary bg-sunken px-1.5 py-0.5 rounded">
-                        Score {b.relevanceScore}
-                      </span>
+                      {b.email && (
+                        <span
+                          className="font-mono text-[10px] text-text-tertiary"
+                          title={b.emailStatus === "pattern_deduced" ? "Derived email — not found publicly" : undefined}
+                        >
+                          {b.email}
+                          {b.emailStatus === "pattern_deduced" && " *"}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>

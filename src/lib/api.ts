@@ -337,8 +337,8 @@ export async function getBuyersForAccount(accountId: string): Promise<Buyer[]> {
           name: b.name,
           title: b.title,
           seniority: (b.seniority as Buyer["seniority"]) || "Director",
-          relevanceScore: 80,
           email: b.email,
+          emailStatus: b.email_status,
           linkedinUrl: b.linkedin_url,
           engagementState: "not_contacted" as const,
         }));
@@ -1173,7 +1173,6 @@ export async function identifyBuyers(accountId: string): Promise<Buyer[]> {
       name: b.name || b.full_name,
       title: b.title || b.job_title,
       seniority: (b.seniority || b.seniority_level || "Director") as Buyer["seniority"],
-      relevanceScore: 85,
       email: b.email,
       linkedinUrl: b.linkedin_url,
       engagementState: "not_contacted" as const,

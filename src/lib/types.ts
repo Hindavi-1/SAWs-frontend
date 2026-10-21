@@ -159,8 +159,9 @@ export interface Buyer {
   name: string;
   title: string;
   seniority: "C-Level" | "VP" | "Director" | "Manager" | "IC";
-  relevanceScore: number;
+  relevanceScore?: number;
   email?: string;
+  emailStatus?: "verified" | "pattern_deduced" | "public_discovered" | "unresolved";
   linkedinUrl?: string;
   engagementState: "not_contacted" | "contacted" | "replied" | "meeting_booked" | "unresponsive";
 }

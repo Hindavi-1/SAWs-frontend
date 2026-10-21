@@ -5,8 +5,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Buyer } from "@/lib/types";
-import { Mail, Sparkles, UserPlus, ShieldCheck, CheckCircle2, Loader2 } from "lucide-react";
+import { Mail, Sparkles, UserPlus, Loader2, Info } from "lucide-react";
 import * as api from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toaster";
 
 interface AccountBuyersTabProps {
@@ -119,13 +120,6 @@ export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdat
                   <p className="text-xs text-text-tertiary">{b.title}</p>
                 </div>
               </div>
-
-              <div className="text-right">
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[var(--radius-xs)] bg-sunken border border-border-subtle font-mono text-xs font-semibold text-text-primary">
-                  <span>{b.relevanceScore}</span>
-                  <span className="text-[10px] text-text-tertiary font-normal">relevance</span>
-                </div>
-              </div>
             </div>
 
             <div className="mt-3.5 pt-3 border-t border-border-subtle flex items-center justify-between gap-2">
@@ -154,13 +148,35 @@ export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdat
                   </a>
                 )}
                 {b.email && (
-                  <a
-                    href={`mailto:${b.email}`}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-accent-500 hover:bg-accent-50/50 rounded-[var(--radius-xs)] transition-colors font-mono"
+                  <span
+                    className="inline-flex items-center gap-1"
+                    title={
+                      b.emailStatus === "pattern_deduced"
+                        ? "Derived email — generated from the company's email naming pattern, not found publicly. Verify before sending."
+                        : undefined
+                    }
                   >
-                    <Mail className="h-3 w-3" />
-                    <span>{b.email}</span>
-                  </a>
+                    <a
+                      href={`mailto:${b.email}`}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-accent-500 hover:bg-accent-50/50 rounded-[var(--radius-xs)] transition-colors font-mono"
+                    >
+                      <Mail className="h-3 w-3" />
+                      <span
+                        className={cn(
+                          b.emailStatus === "pattern_deduced" &&
+                            "underline decoration-dotted underline-offset-2"
+                        )}
+                      >
+                        {b.email}
+                      </span>
+                    </a>
+                    {b.emailStatus === "pattern_deduced" && (
+                      <Info
+                        className="h-3 w-3 shrink-0 text-caution-500"
+                        aria-label="Derived email address"
+                      />
+                    )}
+                  </span>
                 )}
               </div>
             </div>
