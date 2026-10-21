@@ -25,10 +25,11 @@ import type {
   OutreachMessage,
   QualificationCriterion,
 } from "@/lib/types";
-import { useParams } from "next/navigation";
-import { ArrowLeft, Sparkles, Loader2 } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Sparkles, Loader2, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "@/components/ui/toaster";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -42,6 +43,7 @@ const TABS = [
 
 export default function AccountDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [account, setAccount] = React.useState<Account | null | undefined>(undefined);
   const [tab, setTab] = React.useState("overview");
   const [evidence, setEvidence] = React.useState<EvidenceItem[]>([]);
@@ -51,6 +53,8 @@ export default function AccountDetailPage() {
   const [outreach, setOutreach] = React.useState<OutreachMessage[]>([]);
   const [objections, setObjections] = React.useState<Objection[]>([]);
   const [tasks, setTasks] = React.useState<AgentTask[]>([]);
+  const [isDiscardOpen, setIsDiscardOpen] = React.useState(false);
+  const [isDiscarding, setIsDiscarding] = React.useState(false);
 
   const loadAccountData = React.useCallback(async (id: string) => {
     const [a, ev, fit, buys, qual, out, obj, tsk] = await Promise.allSettled([
@@ -83,6 +87,21 @@ export default function AccountDetailPage() {
     loadAccountData(params.id);
   }, [params.id, loadAccountData]);
 
+  const handleConfirmDiscard = async () => {
+    if (!account) return;
+    setIsDiscarding(true);
+    try {
+      await api.discardAccount(account.id);
+      toast.success(`"${account.name}" discarded`, {
+        description: "It has been removed from the pipeline and all tabs.",
+      });
+      router.push("/accounts");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to discard account");
+      setIsDiscarding(false);
+    }
+  };
+
   if (account === undefined) return null;
   if (account === null) {
     return (
@@ -112,6 +131,7 @@ export default function AccountDetailPage() {
       <AccountHeader
         account={account}
         pendingDraftCount={pendingDraftCount}
+        onDiscard={() => setIsDiscardOpen(true)}
       />
 
       {/* 3-column layout: Tabs+Content | Right Rail */}
@@ -181,6 +201,48 @@ export default function AccountDetailPage() {
           <AccountRightRail account={account} onAccountUpdated={handleAccountUpdated} />
         </div>
       </div>
+
+      {/* Discard confirmation */}
+      {isDiscardOpen && typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+            <Card className="w-full max-w-md border-risk-500/40 bg-raised p-5 shadow-2xl space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-risk-500/10 border border-risk-500/30 text-risk-500">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">Discard account?</h3>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    <strong>{account.name}</strong> will be permanently removed from the pipeline and
+                    every tab (dashboard, buyers, research and outreach). This cannot be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDiscardOpen(false)}
+                  disabled={isDiscarding}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleConfirmDiscard}
+                  loading={isDiscarding}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Discard Account</span>
+                </Button>
+              </div>
+            </Card>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

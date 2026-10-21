@@ -6,14 +6,16 @@ import { RadialScore } from "@/components/ui/radial-score";
 import { StageBadge, HealthBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Account } from "@/lib/types";
-import { ExternalLink, Send } from "lucide-react";
+import { ExternalLink, Send, Trash2 } from "lucide-react";
 
 interface AccountHeaderProps {
   account: Account;
   pendingDraftCount: number;
+  /** When provided, a discard action is shown. */
+  onDiscard?: () => void;
 }
 
-export function AccountHeader({ account, pendingDraftCount }: AccountHeaderProps) {
+export function AccountHeader({ account, pendingDraftCount, onDiscard }: AccountHeaderProps) {
   return (
     <div className="rounded-[var(--radius-md)] border border-border-default bg-raised p-4 sm:p-5 shadow-xs">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -65,6 +67,18 @@ export function AccountHeader({ account, pendingDraftCount }: AccountHeaderProps
                 Review Drafts ({pendingDraftCount})
               </Button>
             </Link>
+          )}
+
+          {onDiscard && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDiscard}
+              className="gap-1.5 text-risk-500 hover:text-risk-600"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              Discard
+            </Button>
           )}
         </div>
       </div>

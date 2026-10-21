@@ -15,6 +15,7 @@ import {
   Download,
   Building2,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toaster";
@@ -22,12 +23,14 @@ import { toast } from "@/components/ui/toaster";
 interface AccountTableProps {
   accounts: Account[];
   onSelectAccount?: (account: Account) => void;
+  /** When provided, a discard action is shown per row. */
+  onDiscardAccount?: (account: Account) => void;
 }
 
 type SortField = "name" | "fitScore" | "stage" | "daysInStage" | "discoveredAt";
 type SortOrder = "asc" | "desc";
 
-export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
+export function AccountTable({ accounts, onSelectAccount, onDiscardAccount }: AccountTableProps) {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [sortField, setSortField] = React.useState<SortField>("fitScore");
   const [sortOrder, setSortOrder] = React.useState<SortOrder>("desc");
@@ -176,6 +179,7 @@ export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
                 <span>Discovered</span>
                 <SortIcon field="discoveredAt" />
               </th>
+              {onDiscardAccount && <th className="w-12 px-3 py-2.5 text-right">Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-subtle">
@@ -260,6 +264,24 @@ export function AccountTable({ accounts, onSelectAccount }: AccountTableProps) {
                   <td className="px-4 py-2.5 text-text-tertiary text-right font-mono">
                     {formatDate(a.discoveredAt)}
                   </td>
+
+                  {/* Actions */}
+                  {onDiscardAccount && (
+                    <td className="w-12 px-3 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        title="Discard account"
+                        aria-label={`Discard ${a.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDiscardAccount(a);
+                        }}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-risk-500/10 hover:text-risk-500"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}

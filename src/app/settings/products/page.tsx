@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getProducts, selectActiveProduct, createProduct, saveICP } from "@/lib/api";
+import { getProducts, selectActiveProduct, createProduct, saveICP, deleteProduct, deleteCurrentCompany } from "@/lib/api";
+import { useAuth } from "@/components/auth/auth-provider";
 import type { Product, Company } from "@/lib/types";
 import { toast } from "sonner";
 import {
@@ -23,14 +24,23 @@ import {
   Play,
   Loader2,
   X,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 export default function ProductsSettingsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role?.toLowerCase() === "admin";
   const [company, setCompany] = React.useState<Company | null>(null);
   const [products, setProducts] = React.useState<Product[]>([]);
   const [activeProductId, setActiveProductId] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+
+  // Deletion state
+  const [productToDelete, setProductToDelete] = React.useState<Product | null>(null);
+  const [isCompanyDeleteOpen, setIsCompanyDeleteOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   // Quick Add Product Modal State
   const [isAddOpen, setIsAddOpen] = React.useState(false);
@@ -118,6 +128,39 @@ export default function ProductsSettingsPage() {
       window.dispatchEvent(new Event("sawf_product_updated"));
     } catch {
       toast.error("Failed to switch product");
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteProduct(productToDelete.id);
+      toast.success(`Product "${productToDelete.name}" deleted`, {
+        description: "All of its discovered accounts, buyers and outreach drafts were removed.",
+      });
+      setProductToDelete(null);
+      window.dispatchEvent(new Event("sawf_product_updated"));
+      await loadData();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete product");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCompany = async () => {
+    setIsDeleting(true);
+    try {
+      await deleteCurrentCompany();
+      toast.success("Company deleted", {
+        description: "The tenant and all associated data were removed. Signing out…",
+      });
+      setIsCompanyDeleteOpen(false);
+      window.location.href = "/login";
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to delete company");
+      setIsDeleting(false);
     }
   };
 
@@ -275,6 +318,21 @@ export default function ProductsSettingsPage() {
                           <ArrowRight className="h-3 w-3" />
                         </Button>
                       </Link>
+
+                      <Button
+                        variant="ghost"
+                        onClick={() => setProductToDelete(prod)}
+                        disabled={products.length <= 1}
+                        title={
+                          products.length <= 1
+                            ? "At least one product must remain"
+                            : "Delete this product"
+                        }
+                        className="text-xs gap-1 text-risk-500 hover:text-risk-600 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Delete</span>
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -283,6 +341,33 @@ export default function ProductsSettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Danger Zone — admin only */}
+      {isAdmin && (
+        <Card className="border-risk-500/30 bg-risk-500/5 p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-risk-500" />
+            <h2 className="text-sm font-bold text-text-primary">Danger Zone</h2>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-text-primary">Delete this company</p>
+              <p className="text-[11px] text-text-tertiary">
+                Permanently removes the tenant — its users, products, ICPs, discovered accounts,
+                buyers and outreach drafts. This cannot be undone.
+              </p>
+            </div>
+            <Button
+              variant="danger"
+              className="gap-2 shrink-0"
+              onClick={() => setIsCompanyDeleteOpen(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete Company</span>
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Modal 1: Quick Add Product */}
       {isAddOpen && typeof document !== "undefined" &&
@@ -404,6 +489,69 @@ export default function ProductsSettingsPage() {
                 }}
               >
                 Skip for Now
+              </Button>
+            </div>
+          </Card>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal 3: Confirm product deletion */}
+      {productToDelete && typeof document !== "undefined" &&
+        createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
+          <Card className="w-full max-w-md border-risk-500/40 bg-raised p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-risk-500/10 border border-risk-500/30 text-risk-500">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-text-primary">Delete product?</h3>
+                <p className="mt-1 text-xs text-text-secondary">
+                  This permanently deletes <strong>{productToDelete.name}</strong>, its ICPs, and every
+                  discovered account with its buyers, research and outreach drafts. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+              <Button variant="outline" onClick={() => setProductToDelete(null)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteProduct} loading={isDeleting} className="gap-2">
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Product</span>
+              </Button>
+            </div>
+          </Card>
+        </div>,
+        document.body
+      )}
+
+      {/* Modal 4: Confirm company deletion */}
+      {isCompanyDeleteOpen && typeof document !== "undefined" &&
+        createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fade-in">
+          <Card className="w-full max-w-md border-risk-500/40 bg-raised p-6 shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-risk-500/10 border border-risk-500/30 text-risk-500">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-text-primary">Delete company?</h3>
+                <p className="mt-1 text-xs text-text-secondary">
+                  This permanently deletes <strong>{company?.name || "this company"}</strong> and all
+                  associated data — users, products, accounts, buyers and outreach. You will be signed
+                  out. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+              <Button variant="outline" onClick={() => setIsCompanyDeleteOpen(false)} disabled={isDeleting}>
+                Cancel
+              </Button>
+              <Button variant="danger" onClick={handleDeleteCompany} loading={isDeleting} className="gap-2">
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Company</span>
               </Button>
             </div>
           </Card>

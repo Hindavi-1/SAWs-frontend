@@ -9,10 +9,13 @@ import * as api from "@/lib/api";
 import type { Account, FunnelStage } from "@/lib/types";
 import { FUNNEL_STAGES, STAGE_LABELS, reachedStageCount, stageRank } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Kanban, List, Search, Filter, Sparkles, Building2, AlertCircle } from "lucide-react";
+import { Kanban, List, Search, Filter, Sparkles, Building2, AlertCircle, Trash2, AlertTriangle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import * as React from "react";
+import { createPortal } from "react-dom";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 type SavedView = "all" | "high_fit" | "outreach" | "attention" | "recent";
 
@@ -37,6 +40,10 @@ function AccountsPageInner() {
   const [peekAccount, setPeekAccount] = React.useState<Account | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
+  // Discard state
+  const [discardTarget, setDiscardTarget] = React.useState<Account | null>(null);
+  const [isDiscarding, setIsDiscarding] = React.useState(false);
+
   const loadAccounts = React.useCallback(() => {
     api.getAccounts().then(setAccounts);
   }, []);
@@ -55,6 +62,27 @@ function AccountsPageInner() {
   const handleSelectAccount = (acc: Account) => {
     setPeekAccount(acc);
     setDrawerOpen(true);
+  };
+
+  const handleConfirmDiscard = async () => {
+    if (!discardTarget) return;
+    setIsDiscarding(true);
+    try {
+      await api.discardAccount(discardTarget.id);
+      toast.success(`"${discardTarget.name}" discarded`, {
+        description: "It has been removed from the pipeline and all tabs.",
+      });
+      setAccounts((prev) => prev.filter((a) => a.id !== discardTarget.id));
+      if (peekAccount?.id === discardTarget.id) {
+        setDrawerOpen(false);
+        setPeekAccount(null);
+      }
+      setDiscardTarget(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to discard account");
+    } finally {
+      setIsDiscarding(false);
+    }
   };
 
   const stageFilter: FunnelStage | "all" = stageOverride ?? stageParam ?? "all";
@@ -178,7 +206,11 @@ function AccountsPageInner() {
       {/* Main View Area */}
       {view === "table" ? (
         <Card className="overflow-hidden border-border-default">
-          <AccountTable accounts={filtered} onSelectAccount={handleSelectAccount} />
+          <AccountTable
+            accounts={filtered}
+            onSelectAccount={handleSelectAccount}
+            onDiscardAccount={setDiscardTarget}
+          />
         </Card>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-4">
@@ -208,7 +240,21 @@ function AccountsPageInner() {
                           <p className="truncate text-xs font-semibold text-text-primary hover:text-accent-500">
                             {a.name}
                           </p>
-                          <HealthBadge health={a.health} />
+                          <div className="flex items-center gap-1 shrink-0">
+                            <HealthBadge health={a.health} />
+                            <button
+                              type="button"
+                              title="Discard account"
+                              aria-label={`Discard ${a.name}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDiscardTarget(a);
+                              }}
+                              className="inline-flex h-5 w-5 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-risk-500/10 hover:text-risk-500"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
                         </div>
                         <p className="text-[11px] text-text-tertiary truncate mb-2">{a.industry}</p>
                         <div className="flex items-center justify-between border-t border-border-subtle/50 pt-2 text-[10px] text-text-tertiary">
@@ -231,6 +277,49 @@ function AccountsPageInner() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       />
+
+      {/* Discard confirmation */}
+      {discardTarget && typeof document !== "undefined" &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+            <Card className="w-full max-w-md border-risk-500/40 bg-raised p-5 shadow-2xl space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-risk-500/10 border border-risk-500/30 text-risk-500">
+                  <AlertTriangle className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-text-primary">Discard account?</h3>
+                  <p className="mt-1 text-xs text-text-secondary">
+                    <strong>{discardTarget.name}</strong> will be permanently removed from the
+                    pipeline and every tab (dashboard, buyers, research and outreach). This cannot
+                    be undone.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-subtle">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDiscardTarget(null)}
+                  disabled={isDiscarding}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={handleConfirmDiscard}
+                  loading={isDiscarding}
+                  className="gap-1.5"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Discard Account</span>
+                </Button>
+              </div>
+            </Card>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

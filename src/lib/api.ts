@@ -892,6 +892,80 @@ export async function selectActiveProduct(productId: string, companyId?: string)
   return latency(true, 100);
 }
 
+export async function deleteProduct(productId: string): Promise<boolean> {
+  const res = await apiFetch(`/api/products/${productId}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Failed to delete product: ${errText}`);
+  }
+  if (typeof window !== "undefined") {
+    const active = localStorage.getItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT);
+    if (active === productId) localStorage.removeItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT);
+  }
+  return true;
+}
+
+export async function deleteCurrentCompany(): Promise<boolean> {
+  const res = await apiFetch("/api/products/company/current", {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Failed to delete company: ${errText}`);
+  }
+  return true;
+}
+
+export async function discardAccount(accountId: string): Promise<void> {
+  const res = await apiFetch(`/api/discovery/accounts/${accountId}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Failed to discard account: ${errText}`);
+  }
+}
+
+export async function updateDatabaseRecord(
+  table: string,
+  rowId: string,
+  updates: Record<string, unknown>
+): Promise<void> {
+  const res = await apiFetch(`/api/admin/database/${table}/${rowId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ updates }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Failed to update row: ${errText}`);
+  }
+}
+
+export async function deleteDatabaseRecord(table: string, rowId: string): Promise<void> {
+  const res = await apiFetch(`/api/admin/database/${table}/${rowId}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "Unknown error");
+    throw new Error(`Failed to delete row: ${errText}`);
+  }
+}
+
+export async function getEditableColumns(): Promise<Record<string, string[]>> {
+  const res = await apiFetch("/api/admin/database/editable-columns", { cache: "no-store" });
+  if (!res.ok) return {};
+  const data = await res.json();
+  return data.tables ?? {};
+}
+
 export async function generateICPFromProduct(payload: GenerateICPInput): Promise<any> {
   try {
     const res = await apiFetch("/api/icp/generate-from-product", {
