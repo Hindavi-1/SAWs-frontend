@@ -747,17 +747,6 @@ function getLocalStoredProducts(): Product[] {
   }
 }
 
-function saveLocalStoredProduct(product: Product) {
-  if (typeof window === "undefined") return;
-  try {
-    const existing = getLocalStoredProducts();
-    const updated = [product, ...existing.filter((p) => p.id !== product.id)];
-    localStorage.setItem(LOCAL_STORAGE_KEY_PRODUCTS, JSON.stringify(updated));
-  } catch {
-    // Ignore storage errors
-  }
-}
-
 export async function getProducts(companyId?: string): Promise<{
   company: Company;
   activeProductId: string | null;
@@ -812,8 +801,9 @@ export async function getProducts(companyId?: string): Promise<{
 }
 
 export async function createProduct(payload: CreateProductInput): Promise<Product> {
+  let res: Response;
   try {
-    const res = await apiFetch("/api/products", {
+    res = await apiFetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -825,71 +815,65 @@ export async function createProduct(payload: CreateProductInput): Promise<Produc
         set_as_active: payload.setAsActive ?? true,
       }),
     });
-    if (res.ok) {
-      const data = await res.json();
-      const p = data.product;
-      const created: Product = {
-        id: p.id,
-        companyId: p.company_id,
-        name: p.name,
-        description: p.description,
-        targetMarket: p.target_market,
-        valueProposition: p.value_proposition,
-        isActive: p.is_active,
-        isSelected: payload.setAsActive ?? true,
-        icpCount: 0,
-        createdAt: p.created_at,
-        updatedAt: p.updated_at,
-      };
-      if (typeof window !== "undefined" && (payload.setAsActive ?? true)) {
-        localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, created.id);
-      }
-      return created;
-    }
   } catch {
-    // Fallback to local simulation
+    throw new Error("Could not reach the server to create the product.");
   }
 
-  const id = "prod_" + Date.now();
-  const newProduct: Product = {
-    id,
-    companyId: payload.companyId || mock.mockCompany.id,
-    name: payload.name,
-    description: payload.description,
-    targetMarket: payload.targetMarket,
-    valueProposition: payload.valueProposition,
-    isActive: true,
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to create the product (${res.status})${errText ? `: ${errText.slice(0, 200)}` : ""}`
+    );
+  }
+
+  const data = await res.json();
+  const p = data.product;
+  const created: Product = {
+    id: p.id,
+    companyId: p.company_id,
+    name: p.name,
+    description: p.description,
+    targetMarket: p.target_market,
+    valueProposition: p.value_proposition,
+    isActive: p.is_active,
     isSelected: payload.setAsActive ?? true,
-    icpCount: 1,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    icpCount: 0,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
   };
-
-  saveLocalStoredProduct(newProduct);
   if (typeof window !== "undefined" && (payload.setAsActive ?? true)) {
-    localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, id);
+    localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, created.id);
   }
-
-  return latency(newProduct, 200);
+  return created;
 }
 
 export async function selectActiveProduct(productId: string, companyId?: string): Promise<boolean> {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, productId);
-  }
-
+  let res: Response;
   try {
-    const res = await apiFetch(`/api/products/${productId}/select`, {
+    res = await apiFetch(`/api/products/${productId}/select`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ company_id: companyId || mock.mockCompany.id }),
     });
-    if (res.ok) return true;
   } catch {
-    // Handled by localStorage fallback
+    throw new Error("Could not reach the server to switch the active product.");
   }
 
-  return latency(true, 100);
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to switch the active product (${res.status})${errText ? `: ${errText.slice(0, 200)}` : ""}`
+    );
+  }
+
+  // Only trust the switch once the server confirms it, so callers never
+  // report success for a switch that did not actually take effect.
+  const data = await res.json().catch(() => null);
+  const confirmedId: string = data?.active_product_id || productId;
+  if (typeof window !== "undefined") {
+    localStorage.setItem(LOCAL_STORAGE_KEY_ACTIVE_PRODUCT, confirmedId);
+  }
+  return true;
 }
 
 export async function deleteProduct(productId: string): Promise<boolean> {

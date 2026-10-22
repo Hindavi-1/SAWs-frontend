@@ -202,18 +202,24 @@ export default function OnboardingPage() {
         rawDocumentText: extractedSnippet || undefined,
       });
 
-      // 3. Set Active Product in company context
-      await selectActiveProduct(product.id);
-
       window.dispatchEvent(new Event("sawf_product_updated"));
-      toast.success("Product and ICP successfully configured!", {
-        description: `Active pipeline switched to: ${product.name}`,
-      });
+
+      // 3. Set Active Product in company context
+      try {
+        await selectActiveProduct(product.id);
+        toast.success("Product and ICP successfully configured!", {
+          description: `Active pipeline switched to: ${product.name}`,
+        });
+      } catch (e) {
+        toast.warning("Product and ICP saved, but the active product could not be switched.", {
+          description: e instanceof Error ? e.message : undefined,
+        });
+      }
 
       // Show auto discovery pop-up modal
       setCreatedProductForModal(product);
-    } catch {
-      toast.error("An error occurred while saving. Please try again.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "An error occurred while saving. Please try again.");
     } finally {
       setIsSubmitting(false);
     }

@@ -104,15 +104,22 @@ export default function ProductsSettingsPage() {
         },
       });
 
-      await selectActiveProduct(p.id);
       window.dispatchEvent(new Event("sawf_product_updated"));
-      toast.success(`Product "${p.name}" created and set as active!`);
+
+      try {
+        await selectActiveProduct(p.id);
+        toast.success(`Product "${p.name}" created and set as active!`);
+      } catch (e) {
+        toast.warning(`Product "${p.name}" was created, but the active product could not be switched.`, {
+          description: e instanceof Error ? e.message : undefined,
+        });
+      }
 
       setIsAddOpen(false);
       setCreatedProductForModal(p);
       loadData();
-    } catch {
-      toast.error("Failed to create product");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to create product");
     } finally {
       setIsSaving(false);
     }
@@ -215,7 +222,7 @@ export default function ProductsSettingsPage() {
           </span>
           <div className="mt-2 truncate">
             <span className="text-sm font-bold text-text-primary truncate block">
-              {products.find((p) => p.id === activeProductId)?.name || "ZeroTrust Cloud SASE Platform"}
+              {products.find((p) => p.id === activeProductId)?.name || "No product selected"}
             </span>
             <span className="text-[11px] text-text-tertiary">Active in Topbar Switcher</span>
           </div>

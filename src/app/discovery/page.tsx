@@ -64,12 +64,18 @@ function DiscoveryPageInner() {
     if (loadedAccounts.length > 0) {
       setRunState("done");
     }
-    if (autoRunParam === "true") {
-      setTimeout(() => {
-        startRun();
-      }, 500);
-    }
-  }, [autoRunParam]);
+  }, []);
+
+  // Auto-run once the ICPs are loaded. This has to live in an effect (rather than
+  // inside `loadInitialData`) so that `startRun` closes over the *loaded* ICP
+  // state instead of the empty first-render state.
+  const autoRunTriggered = React.useRef(false);
+  React.useEffect(() => {
+    if (autoRunParam !== "true" || autoRunTriggered.current) return;
+    if (!selectedIcpId) return;
+    autoRunTriggered.current = true;
+    startRun();
+  }, [autoRunParam, selectedIcpId]);
 
   React.useEffect(() => {
     loadInitialData();

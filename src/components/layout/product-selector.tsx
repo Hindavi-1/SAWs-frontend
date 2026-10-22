@@ -60,8 +60,10 @@ export function ProductSelector() {
         description: "Pipelines, ICP targeting, and dashboard activities are now focused on this offering.",
       });
       window.dispatchEvent(new Event("sawf_product_updated"));
-    } catch {
-      toast.error("Failed to switch product");
+    } catch (e) {
+      toast.error("Failed to switch product", {
+        description: e instanceof Error ? e.message : undefined,
+      });
     }
   };
 
