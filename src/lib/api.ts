@@ -17,6 +17,7 @@ import type {
   ComplianceFlag,
   CrmSyncStatus,
   DashboardMetrics,
+  EmailAddress,
   EvidenceItem,
   IcpCriterionScore,
   IcpDefinition,
@@ -376,25 +377,40 @@ export async function getQualificationForAccount(accountId: string): Promise<Qua
   return latency(mock.qualificationByAccount[accountId] ?? []);
 }
 
+/** Map a raw `/api/outreach` row into the UI shape, including the denormalized buyer/account context. */
+function mapOutreachMessage(m: any): OutreachMessage {
+  return {
+    id: m.id,
+    accountId: m.account_id,
+    buyerId: m.buyer_id,
+    sequenceStep: m.step_number || 0,
+    channel: (m.channel as OutreachMessage["channel"]) || "email",
+    subject: m.subject,
+    body: m.body,
+    status: m.status as OutreachMessage["status"],
+    recipientEmail: m.recipient_email,
+    senderEmail: m.sender_email,
+    sentAt: m.sent_at,
+    sendError: m.send_error,
+    rejectionReason: m.rejection_reason,
+    lastEditedAt: m.last_edited_at,
+    createdAt: m.created_at,
+    buyerName: m.buyer_name,
+    buyerTitle: m.buyer_title,
+    buyerEmail: m.buyer_email,
+    buyerLinkedinUrl: m.buyer_linkedin_url,
+    accountName: m.account_name,
+    accountDomain: m.account_domain,
+  };
+}
+
 export async function getOutreachForAccount(accountId: string): Promise<OutreachMessage[]> {
   try {
     const res = await apiFetch(`/api/outreach/${accountId}`, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.messages)) {
-        return data.messages.map((m: any) => ({
-          id: m.id,
-          accountId: m.account_id,
-          buyerId: m.buyer_id,
-          sequenceStep: m.step_number || 0,
-          channel: (m.channel as OutreachMessage["channel"]) || "email",
-          subject: m.subject,
-          body: m.body,
-          status: m.status as OutreachMessage["status"],
-          rejectionReason: m.rejection_reason,
-          lastEditedAt: m.last_edited_at,
-          createdAt: m.created_at,
-        }));
+        return data.messages.map(mapOutreachMessage);
       }
     }
   } catch {
@@ -414,19 +430,7 @@ export async function getAllOutreachMessages(productId?: string): Promise<Outrea
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data.messages)) {
-        return data.messages.map((m: any) => ({
-          id: m.id,
-          accountId: m.account_id,
-          buyerId: m.buyer_id,
-          sequenceStep: m.step_number || 0,
-          channel: (m.channel as OutreachMessage["channel"]) || "email",
-          subject: m.subject,
-          body: m.body,
-          status: m.status as OutreachMessage["status"],
-          rejectionReason: m.rejection_reason,
-          lastEditedAt: m.last_edited_at,
-          createdAt: m.created_at,
-        }));
+        return data.messages.map(mapOutreachMessage);
       }
     }
   } catch {
@@ -445,51 +449,26 @@ export async function updateOutreachDraft(
   id: string,
   updates: Partial<OutreachMessage>
 ): Promise<OutreachMessage | undefined> {
-  try {
-    const res = await apiFetch(`/api/outreach/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: updates.status || "pending_approval",
-        body: updates.body,
-        subject: updates.subject,
-        rejection_reason: updates.rejectionReason,
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const m = data.message;
-      return {
-        id: m.id,
-        accountId: m.account_id,
-        buyerId: m.buyer_id,
-        sequenceStep: m.step_number || 0,
-        channel: (m.channel as OutreachMessage["channel"]) || "email",
-        subject: m.subject,
-        body: m.body,
-        status: m.status as OutreachMessage["status"],
-        rejectionReason: m.rejection_reason,
-        lastEditedAt: m.last_edited_at,
-        createdAt: m.created_at,
-      };
-    }
-  } catch {
-    // Fallback
+  const res = await apiFetch(`/api/outreach/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      status: updates.status || "pending_approval",
+      body: updates.body,
+      subject: updates.subject,
+      rejection_reason: updates.rejectionReason,
+      sender_email: updates.senderEmail,
+      recipient_email: updates.recipientEmail,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to save the draft (${res.status})${errText ? `: ${errText.slice(0, 200)}` : ""}`
+    );
   }
-
-  for (const accountId in mock.outreachByAccount) {
-    const list = mock.outreachByAccount[accountId];
-    const index = list.findIndex((m) => m.id === id);
-    if (index !== -1) {
-      mock.outreachByAccount[accountId][index] = {
-        ...list[index],
-        ...updates,
-        lastEditedAt: new Date().toISOString(),
-      };
-      return latency(mock.outreachByAccount[accountId][index]);
-    }
-  }
-  return latency(undefined);
+  const data = await res.json();
+  return mapOutreachMessage(data.message);
 }
 
 export async function approveOutreachDraft(
@@ -512,6 +491,115 @@ export async function rejectOutreachDraft(
     status: "rejected",
     rejectionReason: reason,
   });
+}
+
+/**
+ * Approve a draft AND actually send it. Only resolves once the backend has handed the
+ * message to SMTP; otherwise it throws with the server's reason so the UI can be honest
+ * about the send not having happened.
+ */
+export async function sendOutreachDraft(
+  id: string,
+  payload: {
+    body?: string;
+    subject?: string;
+    recipientEmail?: string;
+    senderEmail?: string;
+  }
+): Promise<OutreachMessage> {
+  let res: Response;
+  try {
+    res = await apiFetch(`/api/outreach/${id}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        body: payload.body,
+        subject: payload.subject,
+        recipient_email: payload.recipientEmail,
+        sender_email: payload.senderEmail,
+      }),
+    });
+  } catch {
+    throw new Error("Could not reach the server to send this email.");
+  }
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    let detail = errText;
+    try {
+      detail = JSON.parse(errText)?.detail || errText;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(detail || `Failed to send the email (${res.status})`);
+  }
+
+  const data = await res.json();
+  return mapOutreachMessage(data.message);
+}
+
+/** Company-wide address book of mailboxes outreach can be sent from. */
+export async function getEmailAddresses(): Promise<EmailAddress[]> {
+  try {
+    const res = await apiFetch("/api/outreach/addresses", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.addresses)) {
+        return data.addresses.map((a: any) => ({
+          id: a.id,
+          email: a.email,
+          label: a.label,
+          isDefault: a.is_default,
+          createdAt: a.created_at,
+        }));
+      }
+    }
+  } catch {
+    // Fall through to an empty book rather than inventing addresses.
+  }
+  return [];
+}
+
+export async function addEmailAddress(
+  email: string,
+  label?: string,
+  isDefault = false
+): Promise<EmailAddress> {
+  let res: Response;
+  try {
+    res = await apiFetch("/api/outreach/addresses", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, label, is_default: isDefault }),
+    });
+  } catch {
+    throw new Error("Could not reach the server to save this email address.");
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    let detail = errText;
+    try {
+      detail = JSON.parse(errText)?.detail || errText;
+    } catch {
+      // keep raw text
+    }
+    throw new Error(detail || `Failed to save the email address (${res.status})`);
+  }
+  const data = await res.json();
+  return {
+    id: data.address.id,
+    email: data.address.email,
+    label: data.address.label,
+    isDefault: data.address.is_default,
+    createdAt: data.address.created_at,
+  };
+}
+
+export async function deleteEmailAddress(id: string): Promise<void> {
+  const res = await apiFetch(`/api/outreach/addresses/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to remove the email address (${res.status})`);
+  }
 }
 
 
@@ -1119,12 +1207,124 @@ export async function uploadICPDocument(file: File, productId?: string, companyI
 
 // ── Modular Workflow APIs (Modules 02 to 06) ─────────────────────────
 
+/** Result of a discovery run. `pipelineJobId` tracks the background M03->M07 chain. */
+export interface DiscoveryRunResult {
+  accounts: Account[];
+  pipelineJobId: string | null;
+}
+
+/** Per-account outcome inside a background pipeline job. */
+export interface PipelineJobAccount {
+  accountId: string;
+  accountName?: string;
+  domain?: string;
+  stage?: string;
+  advancedToOutreach: boolean;
+  blockedAt?: string | null;
+  reason?: string | null;
+  verificationNote?: string | null;
+}
+
+/** A background M03->M07 job started by discovery (or a blocked-account retry). */
+export interface PipelineJob {
+  jobId: string;
+  status: "running" | "done" | "failed";
+  runKind: string;
+  total: number;
+  completed: number;
+  reachedOutreach: number;
+  blocked: number;
+  results: PipelineJobAccount[];
+  alertSent: boolean;
+  alertError?: string | null;
+  error?: string | null;
+}
+
+function mapPipelineJob(job: any): PipelineJob {
+  return {
+    jobId: job.job_id,
+    status: job.status,
+    runKind: job.run_kind || "discovery",
+    total: job.total ?? 0,
+    completed: job.completed ?? 0,
+    reachedOutreach: job.reached_outreach ?? 0,
+    blocked: job.blocked ?? 0,
+    results: (job.results || []).map((r: any) => ({
+      accountId: r.account_id,
+      accountName: r.account_name,
+      domain: r.domain,
+      stage: r.stage,
+      advancedToOutreach: !!r.advanced_to_outreach,
+      blockedAt: r.blocked_at ?? null,
+      reason: r.reason ?? null,
+      verificationNote: r.verification_note ?? null,
+    })),
+    alertSent: !!job.alert_sent,
+    alertError: job.alert_error ?? null,
+    error: job.error ?? null,
+  };
+}
+
+/** Poll the progress and per-account outcome of a background pipeline job. */
+export async function getPipelineJob(jobId: string): Promise<PipelineJob | null> {
+  const res = await apiFetch(`/api/workflow/pipeline-jobs/${jobId}`, { cache: "no-store" });
+  if (!res.ok) {
+    if (res.status === 404) return null;
+    throw new Error(`Failed to read pipeline job (${res.status})`);
+  }
+  const data = await res.json();
+  return data.job ? mapPipelineJob(data.job) : null;
+}
+
+/** Latest job, used to restore the progress view after a page reload. */
+export async function getLatestPipelineJob(): Promise<PipelineJob | null> {
+  const res = await apiFetch("/api/workflow/pipeline-jobs/latest", { cache: "no-store" });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.job ? mapPipelineJob(data.job) : null;
+}
+
+/** Re-run the automated chain for accounts stuck below `outreach_ready`. */
+export async function retryBlockedAccounts(params: {
+  productId?: string;
+  companyId?: string;
+  limit?: number;
+}): Promise<{ status: string; jobId: string | null; count: number; remaining: number }> {
+  const res = await apiFetch("/api/workflow/retry-blocked", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      product_id: params.productId,
+      company_id: params.companyId,
+      limit: params.limit ?? 20,
+    }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const raw = await res.text().catch(() => "");
+    let detail = raw;
+    try {
+      detail = JSON.parse(raw).detail ?? raw;
+    } catch {
+      // body was not JSON — keep the raw text
+    }
+    throw new Error(detail || `Retry failed (${res.status})`);
+  }
+  const data = await res.json();
+  return {
+    status: data.status,
+    jobId: data.job_id ?? null,
+    count: data.count ?? 0,
+    remaining: data.remaining ?? 0,
+  };
+}
+
 export async function runDiscovery(params: {
   icp?: any;
   icpId?: string;
   productId?: string;
   companyId?: string;
-}): Promise<Account[]> {
+}): Promise<DiscoveryRunResult> {
   let productId = params.productId;
   let companyId = params.companyId;
   if (!productId) {
@@ -1154,13 +1354,22 @@ export async function runDiscovery(params: {
   });
 
   if (!res.ok) {
-    const errText = await res.text().catch(() => "Unknown error");
-    throw new Error(`Account discovery failed: ${errText}`);
+    // Surface the backend's own explanation (e.g. "the search provider is
+    // unavailable") instead of a generic failure string.
+    const raw = await res.text().catch(() => "");
+    let detail = raw;
+    try {
+      detail = JSON.parse(raw).detail ?? raw;
+    } catch {
+      // body was not JSON — keep the raw text
+    }
+    throw new Error(detail || `Account discovery failed (${res.status})`);
   }
 
   const data = await res.json();
+  const pipelineJobId: string | null = data.pipeline_job_id ?? null;
   if (Array.isArray(data.accounts)) {
-    return data.accounts.map((a: any) => {
+    const accounts: Account[] = data.accounts.map((a: any) => {
       const score = typeof a.fit_score === "number" ? a.fit_score : 0;
       return {
         id: a.id || `acc_${Date.now()}_${Math.random().toString(36).substring(7)}`,
@@ -1183,8 +1392,9 @@ export async function runDiscovery(params: {
         tags: [],
       };
     });
+    return { accounts, pipelineJobId };
   }
-  return [];
+  return { accounts: [], pipelineJobId };
 }
 
 export async function verifyAccount(accountId: string): Promise<any> {

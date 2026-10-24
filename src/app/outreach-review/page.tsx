@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import * as api from "@/lib/api";
-import type { OutreachMessage, OutreachStatus, EvidenceItem } from "@/lib/types";
+import type { EmailAddress, OutreachMessage, OutreachStatus, EvidenceItem } from "@/lib/types";
 import { DraftQueue } from "@/components/features/outreach-review/draft-queue";
 import { DraftCanvas } from "@/components/features/outreach-review/draft-canvas";
 import { ContextRail } from "@/components/features/outreach-review/context-rail";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 
 export default function OutreachReviewPage() {
   const [allDrafts, setAllDrafts] = React.useState<OutreachMessage[]>([]);
+  const [senderAddresses, setSenderAddresses] = React.useState<EmailAddress[]>([]);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<OutreachStatus | "all">("pending_approval");
   const [channelFilter, setChannelFilter] = React.useState<string>("all");
@@ -32,6 +33,15 @@ export default function OutreachReviewPage() {
       }
       setLoading(false);
     });
+    api.getEmailAddresses().then(setSenderAddresses);
+  }, []);
+
+  const handleAddSenderAddress = React.useCallback(async (email: string) => {
+    const saved = await api.addEmailAddress(email);
+    setSenderAddresses((prev) =>
+      prev.some((a) => a.email === saved.email) ? prev : [...prev, saved]
+    );
+    toast.success(`Added ${saved.email} to your sending addresses`);
   }, []);
 
   const selectedDraft = React.useMemo(() => {
@@ -66,28 +76,74 @@ export default function OutreachReviewPage() {
     [allDrafts, statusFilter]
   );
 
-  // Approve action
+  // Approve action — for email drafts this performs the real send.
   const handleApprove = React.useCallback(
-    async (draftId: string, editedBody: string, editedSubject?: string) => {
+    async (
+      draftId: string,
+      editedBody: string,
+      editedSubject?: string,
+      sendOptions?: { recipientEmail?: string; senderEmail?: string }
+    ) => {
       const target = allDrafts.find((d) => d.id === draftId);
       if (!target) return;
 
-      await api.approveOutreachDraft(draftId, editedBody, editedSubject);
+      // Non-email channels (LinkedIn, call script) have no mailbox to hit: approving
+      // them only records the decision, exactly as before.
+      if (target.channel !== "email") {
+        try {
+          await api.approveOutreachDraft(draftId, editedBody, editedSubject);
+        } catch (e) {
+          toast.error("Could not approve the draft", {
+            description: e instanceof Error ? e.message : undefined,
+          });
+          return;
+        }
+        setAllDrafts((prev) =>
+          prev.map((d) =>
+            d.id === draftId
+              ? { ...d, status: "approved", body: editedBody, subject: editedSubject ?? d.subject }
+              : d
+          )
+        );
+        toast.success(`Draft approved for ${target.buyerName || "buyer"}`, {
+          description: `Dispatch to ${target.accountName || "account"} via ${target.channel.replace("_", " ")}.`,
+        });
+        advanceToNext(draftId);
+        window.dispatchEvent(new Event("sawf_outreach_updated"));
+        return;
+      }
 
-      setAllDrafts((prev) =>
-        prev.map((d) =>
-          d.id === draftId
-            ? { ...d, status: "approved", body: editedBody, subject: editedSubject ?? d.subject }
-            : d
-        )
-      );
-
-      toast.success(`Draft approved for ${target.buyerName || "buyer"}`, {
-        description: `Queued for multi-channel dispatch to ${target.accountName || "account"}.`,
-      });
-
-      advanceToNext(draftId);
-      window.dispatchEvent(new Event("sawf_outreach_updated"));
+      try {
+        const sent = await api.sendOutreachDraft(draftId, {
+          body: editedBody,
+          subject: editedSubject,
+          recipientEmail: sendOptions?.recipientEmail,
+          senderEmail: sendOptions?.senderEmail,
+        });
+        setAllDrafts((prev) => prev.map((d) => (d.id === draftId ? { ...d, ...sent } : d)));
+        toast.success(`Email sent to ${sent.recipientEmail || target.buyerName || "buyer"}`, {
+          description: `Delivered from ${sent.senderEmail || "your sending address"}.`,
+        });
+        advanceToNext(draftId);
+        window.dispatchEvent(new Event("sawf_outreach_updated"));
+      } catch (e) {
+        // Nothing was sent: keep the draft in place and say so plainly.
+        const message = e instanceof Error ? e.message : "The email could not be sent.";
+        setAllDrafts((prev) =>
+          prev.map((d) =>
+            d.id === draftId
+              ? {
+                  ...d,
+                  status: "pending_approval",
+                  body: editedBody,
+                  subject: editedSubject ?? d.subject,
+                  sendError: message,
+                }
+              : d
+          )
+        );
+        toast.error("Email was not sent", { description: message });
+      }
     },
     [allDrafts, advanceToNext]
   );
@@ -128,7 +184,16 @@ export default function OutreachReviewPage() {
           e.preventDefault();
           const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
           const input = document.querySelector<HTMLInputElement>("input[type='text']");
-          handleApprove(selectedDraft.id, textarea?.value || selectedDraft.body, input?.value || selectedDraft.subject);
+          const recipient =
+            document.querySelector<HTMLInputElement>("[data-draft-field='recipient']")?.value;
+          const sender =
+            document.querySelector<HTMLSelectElement>("[data-draft-field='sender']")?.value;
+          handleApprove(
+            selectedDraft.id,
+            textarea?.value || selectedDraft.body,
+            input?.value || selectedDraft.subject,
+            { recipientEmail: recipient, senderEmail: sender }
+          );
         }
         return;
       }
@@ -148,7 +213,14 @@ export default function OutreachReviewPage() {
       } else if (e.key === "a" || e.key === "A") {
         e.preventDefault();
         if (selectedDraft && selectedDraft.status !== "approved") {
-          handleApprove(selectedDraft.id, selectedDraft.body, selectedDraft.subject);
+          const recipient =
+            document.querySelector<HTMLInputElement>("[data-draft-field='recipient']")?.value;
+          const sender =
+            document.querySelector<HTMLSelectElement>("[data-draft-field='sender']")?.value;
+          handleApprove(selectedDraft.id, selectedDraft.body, selectedDraft.subject, {
+            recipientEmail: recipient,
+            senderEmail: sender,
+          });
         }
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
@@ -215,8 +287,10 @@ export default function OutreachReviewPage() {
           <DraftCanvas
             draft={selectedDraft}
             allAccountMessages={accountSequenceMessages}
+            senderAddresses={senderAddresses}
             onApprove={handleApprove}
             onReject={() => setRejectOpen(true)}
+            onAddSenderAddress={handleAddSenderAddress}
             onSelectSequenceStep={handleSelectSequenceStep}
           />
         ) : (

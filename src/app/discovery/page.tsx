@@ -49,6 +49,10 @@ function DiscoveryPageInner() {
   const [results, setResults] = React.useState<Account[]>([]);
   const [view, setView] = React.useState<"grid" | "table">("grid");
   const [activeAccount, setActiveAccount] = React.useState<Account | null>(null);
+  // The M03 -> M07 chain runs in the background, so its progress is tracked
+  // separately from the discovery request itself.
+  const [pipelineJob, setPipelineJob] = React.useState<api.PipelineJob | null>(null);
+  const [isRetrying, setIsRetrying] = React.useState(false);
 
   const loadInitialData = React.useCallback(async () => {
     const loadedIcps = await api.getIcps();
@@ -153,29 +157,102 @@ function DiscoveryPageInner() {
   const selectedIcp = icps.find((i) => i.id === selectedIcpId) || icps[0];
   const recentIcps = icps.slice(0, 3);
 
+  /**
+   * Poll a background pipeline job until it finishes. The chain lives on the
+   * server, so navigating away or reloading no longer interrupts it — this simply
+   * mirrors its progress while the page is open.
+   */
+  async function pollPipelineJob(jobId: string): Promise<api.PipelineJob | null> {
+    // ~40 minutes at 4s; a full batch across several accounts takes a while.
+    for (let i = 0; i < 600; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 4000));
+      let job: api.PipelineJob | null = null;
+      try {
+        job = await api.getPipelineJob(jobId);
+      } catch {
+        continue; // transient read failure — keep polling
+      }
+      if (!job) return null;
+      setPipelineJob(job);
+      if (job.status !== "running") return job;
+    }
+    return null;
+  }
+
+  function reportJobOutcome(job: api.PipelineJob) {
+    if (job.status === "failed") {
+      toast.error("The automated pipeline stopped unexpectedly", {
+        description: job.error || undefined,
+      });
+      return;
+    }
+    const blocked = job.results.filter((r) => !r.advancedToOutreach);
+    if (job.reachedOutreach > 0) {
+      toast.success(
+        `${job.reachedOutreach} of ${job.total} account(s) reached outreach. Emails are drafted and waiting for your approval.`
+      );
+    }
+    if (blocked.length > 0) {
+      toast.warning(`${blocked.length} account(s) stopped before outreach`, {
+        description: job.alertSent
+          ? "The reason for each company has been emailed to the administrator."
+          : job.alertError || "The reason for each is listed below.",
+      });
+    }
+  }
+
+  // Re-attach to a run that is still going after a reload, so the progress view
+  // and its eventual per-company report are never lost.
+  const resumedJobRef = React.useRef(false);
+  React.useEffect(() => {
+    if (resumedJobRef.current) return;
+    resumedJobRef.current = true;
+    (async () => {
+      try {
+        const res = await api.getLatestPipelineJob();
+        if (res?.status === "running") {
+          setRunState("running");
+          setPipelineJob(res);
+          const done = await pollPipelineJob(res.jobId);
+          if (done) {
+            reportJobOutcome(done);
+            setResults(await api.getAccounts());
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("sawf_pipeline_complete"));
+            }
+          }
+          setRunState("done");
+        }
+      } catch {
+        // A failed resume is not worth interrupting the page for.
+      }
+    })();
+  }, []);
+
   async function startRun() {
     setRunState("running");
     setRunStep(0);
+    setPipelineJob(null);
     const interval = setInterval(() => {
       setRunStep((prev) => (prev < RUN_STEPS.length - 1 ? prev + 1 : prev));
     }, 1200);
 
     try {
-      let newlyDiscovered: Account[] = [];
+      let result: api.DiscoveryRunResult = { accounts: [], pipelineJobId: null };
       if (icpMode === "existing" && selectedIcp) {
-        newlyDiscovered = await api.runDiscovery({
+        result = await api.runDiscovery({
           icpId: selectedIcp.id,
           icp: selectedIcp.rawCriteria,
         });
       } else if (icpMode === "upload" && uploadedFile) {
         const uploadResult = await api.uploadICPDocument(uploadedFile);
         if (uploadResult && uploadResult.canonical_icp) {
-          newlyDiscovered = await api.runDiscovery({
+          result = await api.runDiscovery({
             icp: uploadResult.canonical_icp,
           });
         }
       } else if (icpText) {
-        newlyDiscovered = await api.runDiscovery({
+        result = await api.runDiscovery({
           icp: {
             icpName: "Custom Target Segment",
             description: icpText,
@@ -191,12 +268,31 @@ function DiscoveryPageInner() {
         });
       }
 
-      toast.success(
-        `Discovery complete! ${newlyDiscovered.length > 0 ? `Identified ${newlyDiscovered.length} accounts.` : "Queried live data sources."}`
-      );
+      const newlyDiscovered = result.accounts;
+      if (newlyDiscovered.length > 0) {
+        toast.success(`Discovery complete! Identified ${newlyDiscovered.length} accounts.`);
+      } else {
+        // The backend already retries a 0-account run automatically, so reaching
+        // here means every attempt came back with nothing new — never dress that
+        // up as a successful run.
+        toast.warning(
+          "No new accounts found after 3 automatic attempts. Refine the ICP geography, industry or buying signals and run again."
+        );
+      }
+
+      // Hand off to the background chain: the accounts are already persisted, so
+      // the page no longer has to stay open for M03 -> M07 to complete.
+      if (result.pipelineJobId) {
+        clearInterval(interval);
+        setRunStep(RUN_STEPS.length - 1);
+        const job = await pollPipelineJob(result.pipelineJobId);
+        if (job) reportJobOutcome(job);
+      }
     } catch (err) {
       console.error("Discovery run failed:", err);
-      toast.error("Account discovery run encountered an issue.");
+      toast.error("Account discovery run failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
     } finally {
       clearInterval(interval);
       setRunStep(RUN_STEPS.length - 1);
@@ -206,6 +302,43 @@ function DiscoveryPageInner() {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new Event("sawf_pipeline_complete"));
       }
+    }
+  }
+
+  /**
+   * Re-run the automated chain for accounts parked below outreach — the ones a
+   * previously interrupted run left behind. Runs as a background job too.
+   */
+  async function handleRetryBlocked() {
+    setIsRetrying(true);
+    try {
+      const prods = await api.getProducts();
+      const res = await api.retryBlockedAccounts({
+        productId: prods.activeProductId || undefined,
+        companyId: prods.company?.id || undefined,
+        limit: 20,
+      });
+      if (res.status === "nothing_to_retry" || !res.jobId) {
+        toast.success("Nothing to retry — every account has already reached outreach.");
+        return;
+      }
+      toast.info(
+        `Retrying ${res.count} blocked account(s)${res.remaining > 0 ? ` — ${res.remaining} more remain after this batch` : ""}.`
+      );
+      setRunState("running");
+      const job = await pollPipelineJob(res.jobId);
+      if (job) reportJobOutcome(job);
+      setResults(await api.getAccounts());
+      setRunState("done");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("sawf_pipeline_complete"));
+      }
+    } catch (err) {
+      toast.error("Retry failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    } finally {
+      setIsRetrying(false);
     }
   }
 
@@ -497,6 +630,75 @@ function DiscoveryPageInner() {
                 </li>
               ))}
             </ul>
+            {pipelineJob && (
+              <p className="mt-4 border-t border-border-subtle pt-3 text-xs text-text-secondary">
+                <span className="font-semibold text-text-primary">
+                  {pipelineJob.completed} of {pipelineJob.total}
+                </span>{" "}
+                account(s) processed · {pipelineJob.reachedOutreach} reached outreach
+                {pipelineJob.blocked > 0 ? ` · ${pipelineJob.blocked} stopped early` : ""}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Per-company outcome of the background M03 -> M07 chain. Survives a
+          reload, and is the UI counterpart of the administrator digest email. */}
+      {pipelineJob && pipelineJob.results.length > 0 && (
+        <Card className="mb-5">
+          <CardContent className="pt-6">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                  <Sparkles className="h-4 w-4 text-accent-500" />
+                  Automated pipeline report
+                </div>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  {pipelineJob.reachedOutreach} of {pipelineJob.total} account(s) drafted outreach and are awaiting your approval
+                  {pipelineJob.blocked > 0 ? ` · ${pipelineJob.blocked} stopped before outreach` : ""}.
+                  {pipelineJob.alertSent
+                    ? " The reason for each blocked company was emailed to the administrator."
+                    : ""}
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleRetryBlocked}
+                disabled={isRetrying || runState === "running" || pipelineJob.blocked === 0}
+              >
+                {isRetrying && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Retry blocked accounts
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {pipelineJob.results.map((r) => (
+                <div
+                  key={r.accountId}
+                  className="rounded-lg border border-border-subtle bg-sunken/40 px-3.5 py-2.5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-text-primary">
+                      {r.accountName || r.domain || r.accountId}
+                    </span>
+                    {r.advancedToOutreach ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-positive-500">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Reached outreach
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-bold text-risk-500">
+                        Stopped at {r.blockedAt || r.stage || "unknown stage"}
+                      </span>
+                    )}
+                  </div>
+                  {!r.advancedToOutreach && r.reason && (
+                    <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">{r.reason}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

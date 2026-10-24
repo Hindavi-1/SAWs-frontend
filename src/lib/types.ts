@@ -205,6 +205,10 @@ export interface OutreachMessage {
   status: OutreachStatus;
   sentAt?: string;
   sentiment?: "positive" | "neutral" | "negative";
+  // Addressing — both editable by the rep before approving the send
+  recipientEmail?: string;
+  senderEmail?: string;
+  sendError?: string;
   // Sequence Context
   sequenceStep?: number;
   sequenceTotalSteps?: number;
@@ -221,12 +225,22 @@ export interface OutreachMessage {
   buyerName?: string;
   buyerTitle?: string;
   buyerSeniority?: string;
+  buyerEmail?: string;
   buyerLinkedinUrl?: string;
   accountName?: string;
   accountDomain?: string;
   accountIndustry?: string;
   accountFitScore?: number;
   urgency?: "normal" | "high";
+}
+
+/** A mailbox in the company-wide address book used as the From: address. */
+export interface EmailAddress {
+  id: string;
+  email: string;
+  label?: string;
+  isDefault?: boolean;
+  createdAt?: string;
 }
 
 export interface Objection {
