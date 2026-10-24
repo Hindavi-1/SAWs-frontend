@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import * as api from "@/lib/api";
-import type { EmailAddress, OutreachMessage, OutreachStatus, EvidenceItem } from "@/lib/types";
+import type { EmailAddress, OutreachMessage, OutreachStatus } from "@/lib/types";
 import { DraftQueue } from "@/components/features/outreach-review/draft-queue";
 import { DraftCanvas } from "@/components/features/outreach-review/draft-canvas";
-import { ContextRail } from "@/components/features/outreach-review/context-rail";
 import { RejectDialog } from "@/components/features/outreach-review/reject-dialog";
 import { toast } from "@/components/ui/toaster";
 import { CheckCircle2, ArrowRight } from "lucide-react";
@@ -18,8 +17,6 @@ export default function OutreachReviewPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [statusFilter, setStatusFilter] = React.useState<OutreachStatus | "all">("pending_approval");
   const [channelFilter, setChannelFilter] = React.useState<string>("all");
-  const [evidence, setEvidence] = React.useState<EvidenceItem[]>([]);
-  const [contextRailCollapsed, setContextRailCollapsed] = React.useState(false);
   const [rejectOpen, setRejectOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(true);
 
@@ -47,13 +44,6 @@ export default function OutreachReviewPage() {
   const selectedDraft = React.useMemo(() => {
     return allDrafts.find((d) => d.id === selectedId) || null;
   }, [allDrafts, selectedId]);
-
-  // Load evidence for selected draft's account
-  React.useEffect(() => {
-    if (selectedDraft?.accountId) {
-      api.getEvidenceForAccount(selectedDraft.accountId).then(setEvidence);
-    }
-  }, [selectedDraft?.accountId]);
 
   // Messages belonging to the same account & buyer for sequence context
   const accountSequenceMessages = React.useMemo(() => {
@@ -238,19 +228,6 @@ export default function OutreachReviewPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [allDrafts, selectedId, selectedDraft, handleApprove]);
 
-  const handleInsertHook = (hookText: string) => {
-    if (!selectedDraft) return;
-    const textarea = document.querySelector<HTMLTextAreaElement>("textarea");
-    if (textarea) {
-      const current = textarea.value;
-      const updated = `${current}\n\n"${hookText}"`;
-      textarea.value = updated;
-      // trigger input event
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
-      toast("Inserted evidence hook into message body");
-    }
-  };
-
   const handleSelectSequenceStep = (stepNumber: number) => {
     const matching = accountSequenceMessages.find((m) => m.sequenceStep === stepNumber);
     if (matching) {
@@ -285,6 +262,7 @@ export default function OutreachReviewPage() {
       <div className="flex-1 min-w-0 h-full">
         {selectedDraft ? (
           <DraftCanvas
+            key={selectedDraft.id}
             draft={selectedDraft}
             allAccountMessages={accountSequenceMessages}
             senderAddresses={senderAddresses}
@@ -317,17 +295,6 @@ export default function OutreachReviewPage() {
           </div>
         )}
       </div>
-
-      {/* Pane 3: Sales Context Rail (340px, Collapsible) */}
-      {selectedDraft && (
-        <ContextRail
-          draft={selectedDraft}
-          evidence={evidence}
-          collapsed={contextRailCollapsed}
-          onToggleCollapse={() => setContextRailCollapsed(!contextRailCollapsed)}
-          onInsertHook={handleInsertHook}
-        />
-      )}
 
       {/* Rejection Feedback Dialog */}
       <RejectDialog
