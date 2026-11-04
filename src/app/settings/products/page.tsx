@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getProducts, selectActiveProduct, createProduct, saveICP, deleteProduct, deleteCurrentCompany } from "@/lib/api";
+import { getProducts, selectActiveProduct, createProduct, saveICP, deleteProduct, deleteCurrentCompany, extractProductFromWebsite } from "@/lib/api";
 import { useAuth } from "@/components/auth/auth-provider";
 import type { Product, Company } from "@/lib/types";
 import { toast } from "sonner";
@@ -26,6 +26,8 @@ import {
   X,
   Trash2,
   AlertTriangle,
+  Globe,
+  Wand2,
 } from "lucide-react";
 
 export default function ProductsSettingsPage() {
@@ -49,6 +51,8 @@ export default function ProductsSettingsPage() {
   const [newProdDesc, setNewProdDesc] = React.useState("");
   const [newTargetMarket, setNewTargetMarket] = React.useState("");
   const [newValProp, setNewValProp] = React.useState("");
+  const [websiteUrl, setWebsiteUrl] = React.useState("");
+  const [isFetchingWebsite, setIsFetchingWebsite] = React.useState(false);
   const [createdProductForModal, setCreatedProductForModal] = React.useState<Product | null>(null);
 
   const loadData = React.useCallback(async () => {
@@ -70,6 +74,31 @@ export default function ProductsSettingsPage() {
     window.addEventListener("sawf_product_updated", handleUpdate);
     return () => window.removeEventListener("sawf_product_updated", handleUpdate);
   }, [loadData]);
+
+  const handleFetchFromWebsite = async () => {
+    const url = websiteUrl.trim();
+    if (!url) {
+      toast.error("Enter your product or company website URL first.");
+      return;
+    }
+    setIsFetchingWebsite(true);
+    try {
+      const info = await extractProductFromWebsite(url);
+      if (info.name) setNewProdName(info.name);
+      if (info.description) setNewProdDesc(info.description);
+      if (info.targetMarket) setNewTargetMarket(info.targetMarket);
+      if (info.valueProposition) setNewValProp(info.valueProposition);
+      toast.success("Product details pulled from the website", {
+        description: "Review and edit anything before creating the product.",
+      });
+    } catch (e) {
+      toast.error("Could not read the website", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setIsFetchingWebsite(false);
+    }
+  };
 
   const handleCreateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -396,6 +425,45 @@ export default function ProductsSettingsPage() {
             </div>
 
             <form onSubmit={handleCreateProduct} className="space-y-4">
+              <div className="rounded-lg border border-accent-500/25 bg-accent-50/40 dark:bg-accent-500/5 p-3 space-y-2">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-text-primary">
+                  <Globe className="h-3.5 w-3.5 text-accent-500" />
+                  Auto-fill from your website
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={websiteUrl}
+                    onChange={(e) => setWebsiteUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleFetchFromWebsite();
+                      }
+                    }}
+                    placeholder="e.g. acme.com"
+                    className="flex-1 rounded-lg border border-border-subtle bg-raised px-3.5 py-2 text-xs text-text-primary outline-none focus:border-accent-500/40"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleFetchFromWebsite}
+                    disabled={isFetchingWebsite}
+                    className="gap-1.5 shrink-0"
+                  >
+                    {isFetchingWebsite ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isFetchingWebsite ? "Reading…" : "Fetch details"}</span>
+                  </Button>
+                </div>
+                <p className="text-[10px] text-text-tertiary">
+                  We&apos;ll read your site and fill in the fields below so you don&apos;t have to type them out.
+                </p>
+              </div>
+
               <div>
                 <label className="text-xs font-bold text-text-primary block mb-1">Product Name *</label>
                 <input

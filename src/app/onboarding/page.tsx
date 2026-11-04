@@ -11,6 +11,7 @@ import {
   saveICP,
   uploadICPDocument,
   selectActiveProduct,
+  extractProductFromWebsite,
 } from "@/lib/api";
 import type { ICPGenerationMethod } from "@/lib/types";
 import { toast } from "sonner";
@@ -32,6 +33,8 @@ import {
   DollarSign,
   TrendingUp,
   Play,
+  Globe,
+  Wand2,
 } from "lucide-react";
 
 export default function OnboardingPage() {
@@ -47,6 +50,8 @@ export default function OnboardingPage() {
   const [productDescription, setProductDescription] = React.useState("");
   const [targetMarket, setTargetMarket] = React.useState("");
   const [valueProposition, setValueProposition] = React.useState("");
+  const [productWebsite, setProductWebsite] = React.useState("");
+  const [isFetchingWebsite, setIsFetchingWebsite] = React.useState(false);
 
   // Step 2: ICP State
   const [icpMethod, setIcpMethod] = React.useState<ICPGenerationMethod>("llm");
@@ -79,6 +84,32 @@ export default function OnboardingPage() {
     "Recent funding round or acquisition",
     "Upcoming compliance certification deadline",
   ]);
+
+  // Auto-fill the product fields from the company's own website
+  const handleFetchFromWebsite = async () => {
+    const url = productWebsite.trim();
+    if (!url) {
+      toast.error("Enter your product or company website URL first.");
+      return;
+    }
+    setIsFetchingWebsite(true);
+    try {
+      const info = await extractProductFromWebsite(url);
+      if (info.name) setProductName(info.name);
+      if (info.description) setProductDescription(info.description);
+      if (info.targetMarket) setTargetMarket(info.targetMarket);
+      if (info.valueProposition) setValueProposition(info.valueProposition);
+      toast.success("Product details pulled from the website", {
+        description: "Review and edit anything before continuing.",
+      });
+    } catch (e) {
+      toast.error("Could not read the website", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setIsFetchingWebsite(false);
+    }
+  };
 
   // Handle LLM ICP Generation
   const handleGenerateAiICP = async () => {
@@ -293,6 +324,50 @@ export default function OnboardingPage() {
             </h2>
             <p className="mt-1 text-xs text-text-tertiary">
               Companies can register and switch between multiple products on the platform.
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-accent-500/25 bg-accent-50/40 dark:bg-accent-500/5 p-4 space-y-2">
+            <div className="flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5 text-accent-500" />
+              <span className="text-xs font-bold text-text-primary">
+                Auto-fill from your website
+              </span>
+              <span className="rounded-full bg-[var(--agent-surface)] border border-[var(--agent-border)] px-2 py-0.5 text-[9px] font-bold text-[var(--agent-text)]">
+                Fastest
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={productWebsite}
+                onChange={(e) => setProductWebsite(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleFetchFromWebsite();
+                  }
+                }}
+                placeholder="e.g. acme.com or acme.com/product"
+                className="flex-1 rounded-md border border-border-default bg-raised px-3 py-2 text-xs text-text-primary focus:border-accent-500 focus:outline-none"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleFetchFromWebsite}
+                disabled={isFetchingWebsite}
+                className="gap-1.5 shrink-0"
+              >
+                {isFetchingWebsite ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Wand2 className="h-3.5 w-3.5 text-accent-500" />
+                )}
+                <span>{isFetchingWebsite ? "Reading website…" : "Fetch details"}</span>
+              </Button>
+            </div>
+            <p className="text-[10px] text-text-tertiary">
+              We&apos;ll read your site and fill in the product fields below — review and adjust them before continuing.
             </p>
           </div>
 

@@ -935,6 +935,52 @@ export async function createProduct(payload: CreateProductInput): Promise<Produc
   return created;
 }
 
+export interface ExtractedProductInfo {
+  name: string;
+  description: string;
+  targetMarket: string;
+  valueProposition: string;
+  website: string;
+}
+
+/**
+ * Read a public website and return suggested product registration fields so the
+ * rep doesn't have to type the name, description, target market and value prop.
+ */
+export async function extractProductFromWebsite(url: string): Promise<ExtractedProductInfo> {
+  let res: Response;
+  try {
+    res = await apiFetch("/api/products/extract-from-website", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+  } catch {
+    throw new Error("Could not reach the server to read the website.");
+  }
+
+  if (!res.ok) {
+    let detail = `Could not read the website (${res.status}).`;
+    try {
+      const err = await res.json();
+      if (err?.detail) detail = err.detail;
+    } catch {
+      // keep the generic message
+    }
+    throw new Error(detail);
+  }
+
+  const data = await res.json();
+  const p = data.product || {};
+  return {
+    name: p.name || "",
+    description: p.description || "",
+    targetMarket: p.target_market || "",
+    valueProposition: p.value_proposition || "",
+    website: data.website || url,
+  };
+}
+
 export async function selectActiveProduct(productId: string, companyId?: string): Promise<boolean> {
   let res: Response;
   try {
