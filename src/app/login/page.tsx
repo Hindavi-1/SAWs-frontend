@@ -105,10 +105,6 @@ export default function LoginPage() {
             </Link>
           </p>
         </form>
-
-        <p className="mt-4 text-center text-[10px] text-text-tertiary">
-          Demo credentials: demo@acme.com / demo1234
-        </p>
       </div>
     </div>
   );

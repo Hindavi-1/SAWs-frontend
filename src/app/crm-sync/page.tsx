@@ -2,12 +2,35 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getCrmSyncStatus } from "@/lib/api";
 import { formatNumber, timeAgo } from "@/lib/utils";
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import type { CrmSyncStatus } from "@/lib/types";
+import { CheckCircle2, RefreshCw, PlugZap } from "lucide-react";
 
 export default async function CrmSyncPage() {
-  const status = await getCrmSyncStatus();
+  let status: CrmSyncStatus | null = null;
+  try {
+    status = await getCrmSyncStatus();
+  } catch {
+    status = null;
+  }
+
+  if (status === null) {
+    return (
+      <div>
+        <PageHeader
+          title="CRM Integration"
+          description="Bi-directional sync status with your CRM. This is not a funnel stage — it runs continuously alongside every stage."
+        />
+        <EmptyState
+          icon={PlugZap}
+          title="CRM sync is not available"
+          description="No CRM is connected and this view has no live backend data source yet, so it stays empty rather than showing sample sync data that looks real."
+        />
+      </div>
+    );
+  }
 
   return (
     <div>

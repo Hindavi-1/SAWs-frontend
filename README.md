@@ -33,6 +33,18 @@ npm run lint    # eslint
 
 ---
 
+## Environment variables
+
+Copy `.env.example` to `.env.local` and adjust as needed:
+
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | Base URL the browser uses for the backend. Leave blank to call the same origin through the server-side proxy. |
+| `BACKEND_URL` | Backend origin for the `/api/*` proxy in `next.config.ts`. Set this in deployment (e.g. `https://api.example.com`). |
+| `NEXT_PUBLIC_ENABLE_MOCK_FALLBACKS` | `true` restores the bundled mock data when a backend call fails. Off by default so a backend error surfaces instead of being hidden behind fabricated data. |
+
+---
+
 ## Project structure
 
 ```

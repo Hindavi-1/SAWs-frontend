@@ -72,7 +72,7 @@ export default function OutreachReviewPage() {
       draftId: string,
       editedBody: string,
       editedSubject?: string,
-      sendOptions?: { recipientEmail?: string; senderEmail?: string }
+      sendOptions?: { recipientEmail?: string; senderEmail?: string; confirmUnverifiedRecipient?: boolean }
     ) => {
       const target = allDrafts.find((d) => d.id === draftId);
       if (!target) return;
@@ -109,6 +109,7 @@ export default function OutreachReviewPage() {
           subject: editedSubject,
           recipientEmail: sendOptions?.recipientEmail,
           senderEmail: sendOptions?.senderEmail,
+          confirmUnverifiedRecipient: sendOptions?.confirmUnverifiedRecipient,
         });
         setAllDrafts((prev) => prev.map((d) => (d.id === draftId ? { ...d, ...sent } : d)));
         toast.success(`Email sent to ${sent.recipientEmail || target.buyerName || "buyer"}`, {

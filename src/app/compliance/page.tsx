@@ -2,13 +2,37 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getComplianceFlags } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
 import { ShieldAlert } from "lucide-react";
+import type { ComplianceFlag } from "@/lib/types";
 import Link from "next/link";
 
 export default async function CompliancePage() {
-  const flags = await getComplianceFlags();
+  let flags: ComplianceFlag[] | null = null;
+  try {
+    flags = await getComplianceFlags();
+  } catch {
+    flags = null;
+  }
+
+  if (flags === null) {
+    return (
+      <div>
+        <PageHeader
+          title="Compliance & Quality"
+          description="Consent, data-freshness, and quality checks that gate outreach — applied automatically across every stage, not tied to a single funnel step."
+        />
+        <EmptyState
+          icon={ShieldAlert}
+          title="Compliance checks are not available"
+          description="This view has no live backend data source yet, so it stays empty rather than showing sample flags that look real."
+        />
+      </div>
+    );
+  }
+
   const blocking = flags.filter((f) => f.severity === "blocking" && f.status === "open");
   const warnings = flags.filter((f) => f.severity === "warning" && f.status === "open");
 

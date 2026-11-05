@@ -40,6 +40,32 @@ import { FUNNEL_STAGES, reachedStageCount } from "./types";
 const latency = <T,>(value: T, ms = 0): Promise<T> =>
   ms > 0 ? new Promise((resolve) => setTimeout(() => resolve(value), ms)) : Promise.resolve(value);
 
+/**
+ * Whether the UI may silently substitute mock data when a real backend call fails.
+ *
+ * Off by default: a failed request surfaces as an error instead of quietly rendering
+ * fabricated data that looks like a working backend. Set
+ * NEXT_PUBLIC_ENABLE_MOCK_FALLBACKS=true to restore the old demo behaviour when
+ * running the UI without a backend.
+ */
+const MOCK_FALLBACKS_ENABLED = process.env.NEXT_PUBLIC_ENABLE_MOCK_FALLBACKS === "true";
+
+/**
+ * Return `value` as a fallback, or throw when mock fallbacks are disabled so the
+ * caller (and the user) sees that the backend call failed rather than mock data.
+ */
+function mockFallback<T>(source: string, value: T): T {
+  if (!MOCK_FALLBACKS_ENABLED) {
+    throw new Error(
+      `${source} failed: the backend is unavailable or returned an error, and mock data is disabled.`
+    );
+  }
+  if (typeof console !== "undefined") {
+    console.warn(`[api] ${source}: backend unavailable — showing mock data.`);
+  }
+  return value;
+}
+
 export async function getDashboardMetrics(productId?: string): Promise<DashboardMetrics> {
   try {
     if (!productId) {
@@ -155,7 +181,7 @@ export async function getAccounts(productId?: string): Promise<Account[]> {
   } catch {
     // Fallback to mock data only if fetch fails
   }
-  return latency(mock.accounts);
+  return mockFallback("getAccounts", latency(mock.accounts));
 }
 
 export async function getAccount(id: string): Promise<Account | undefined> {
@@ -211,7 +237,7 @@ export async function getAccount(id: string): Promise<Account | undefined> {
   } catch {
     // Fallback
   }
-  return latency(mock.accounts.find((a) => a.id === id));
+  return mockFallback("getAccount", latency(mock.accounts.find((a) => a.id === id)));
 }
 
 export async function getIcps(productId?: string): Promise<IcpDefinition[]> {
@@ -299,7 +325,7 @@ export async function getEvidenceForAccount(accountId: string): Promise<Evidence
   } catch {
     // Fallback
   }
-  return latency(mock.evidenceByAccount[accountId] ?? []);
+  return mockFallback("getEvidenceForAccount", latency(mock.evidenceByAccount[accountId] ?? []));
 }
 
 export async function getIcpFitForAccount(accountId: string): Promise<IcpCriterionScore[]> {
@@ -323,7 +349,7 @@ export async function getIcpFitForAccount(accountId: string): Promise<IcpCriteri
   } catch {
     // Fallback
   }
-  return latency(mock.icpFitByAccount[accountId] ?? []);
+  return mockFallback("getIcpFitForAccount", latency(mock.icpFitByAccount[accountId] ?? []));
 }
 
 export async function getBuyersForAccount(accountId: string): Promise<Buyer[]> {
@@ -348,7 +374,7 @@ export async function getBuyersForAccount(accountId: string): Promise<Buyer[]> {
   } catch {
     // Fallback
   }
-  return latency(mock.buyersByAccount[accountId] ?? []);
+  return mockFallback("getBuyersForAccount", latency(mock.buyersByAccount[accountId] ?? []));
 }
 
 export async function getQualificationForAccount(accountId: string): Promise<QualificationCriterion[]> {
@@ -374,7 +400,7 @@ export async function getQualificationForAccount(accountId: string): Promise<Qua
   } catch {
     // Fallback to mock data
   }
-  return latency(mock.qualificationByAccount[accountId] ?? []);
+  return mockFallback("getQualificationForAccount", latency(mock.qualificationByAccount[accountId] ?? []));
 }
 
 /** Map a raw `/api/outreach` row into the UI shape, including the denormalized buyer/account context. */
@@ -398,6 +424,7 @@ function mapOutreachMessage(m: any): OutreachMessage {
     buyerName: m.buyer_name,
     buyerTitle: m.buyer_title,
     buyerEmail: m.buyer_email,
+    buyerEmailStatus: m.buyer_email_status,
     buyerLinkedinUrl: m.buyer_linkedin_url,
     accountName: m.account_name,
     accountDomain: m.account_domain,
@@ -416,7 +443,7 @@ export async function getOutreachForAccount(accountId: string): Promise<Outreach
   } catch {
     // Fallback
   }
-  return latency(mock.outreachByAccount[accountId] ?? []);
+  return mockFallback("getOutreachForAccount", latency(mock.outreachByAccount[accountId] ?? []));
 }
 
 export async function getAllOutreachMessages(productId?: string): Promise<OutreachMessage[]> {
@@ -436,8 +463,10 @@ export async function getAllOutreachMessages(productId?: string): Promise<Outrea
   } catch {
     // Fallback
   }
-  const all = Object.values(mock.outreachByAccount).flat();
-  return latency(all);
+  return mockFallback(
+    "getAllOutreachMessages",
+    latency(Object.values(mock.outreachByAccount).flat())
+  );
 }
 
 export async function getPendingOutreachDrafts(productId?: string): Promise<OutreachMessage[]> {
@@ -505,6 +534,8 @@ export async function sendOutreachDraft(
     subject?: string;
     recipientEmail?: string;
     senderEmail?: string;
+    /** Acknowledge sending to an inferred (pattern-deduced) recipient. */
+    confirmUnverifiedRecipient?: boolean;
   }
 ): Promise<OutreachMessage> {
   let res: Response;
@@ -517,6 +548,7 @@ export async function sendOutreachDraft(
         subject: payload.subject,
         recipient_email: payload.recipientEmail,
         sender_email: payload.senderEmail,
+        confirm_unverified_recipient: payload.confirmUnverifiedRecipient ?? false,
       }),
     });
   } catch {
@@ -604,7 +636,8 @@ export async function deleteEmailAddress(id: string): Promise<void> {
 
 
 export async function getObjectionsForAccount(accountId: string): Promise<Objection[]> {
-  return latency(mock.objectionsByAccount[accountId] ?? []);
+  // No backend endpoint backs objections yet; this is sample data only.
+  return mockFallback("Objections", latency(mock.objectionsByAccount[accountId] ?? []));
 }
 
 export async function getAgentTasks(): Promise<AgentTask[]> {
@@ -633,29 +666,34 @@ export async function getApprovalQueue(): Promise<ApprovalItem[]> {
   }));
 }
 
+// The four views below (module ops, compliance, CRM sync, ICP outcomes) have no live
+// backend data source yet. They return sample data through `mockFallback`, so when mock
+// data is disabled they throw and the page reports the gap instead of rendering numbers
+// that look real.
+
 export async function getModuleStatuses(): Promise<ModuleStatus[]> {
-  return latency(mock.moduleStatuses);
+  return mockFallback("Module statuses", latency(mock.moduleStatuses));
 }
 
 export async function getComplianceFlags(): Promise<ComplianceFlag[]> {
-  return latency(mock.complianceFlags);
+  return mockFallback("Compliance flags", latency(mock.complianceFlags));
 }
 
 export async function getCrmSyncStatus(): Promise<CrmSyncStatus> {
-  return latency(mock.crmSyncStatus);
+  return mockFallback("CRM sync status", latency(mock.crmSyncStatus));
 }
 
 export async function getOutcomeRecords(): Promise<OutcomeRecord[]> {
-  return latency(mock.outcomeRecords);
+  return mockFallback("ICP outcomes", latency(mock.outcomeRecords));
 }
 
-// ── Module Pipeline Trace (Backend HTTP calls) ──────────────────────
-// Calls FastAPI backend directly (http://127.0.0.1:8000) to prevent Next.js proxy socket hang ups,
-// with graceful fallback to relative /api/* if needed.
+// ── Backend HTTP calls ──────────────────────────────────────────────
+// NEXT_PUBLIC_API_URL points at the FastAPI backend (e.g. http://127.0.0.1:8000 in
+// local dev). When it is unset we fall back to the same origin, which routes through
+// the server-side /api proxy in next.config.ts — the right default for a deployment
+// where the frontend and API share a domain.
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL ||
-  (typeof window !== "undefined" ? "http://127.0.0.1:8000" : "http://127.0.0.1:8000");
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const fullUrl = `${API_BASE}${path}`;
@@ -666,10 +704,12 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
   }
   const authedOptions: RequestInit = { ...options, headers };
   try {
-    const res = await fetch(fullUrl, authedOptions);
-    return res;
-  } catch {
-    // If direct backend call fails, try relative proxy
+    return await fetch(fullUrl, authedOptions);
+  } catch (err) {
+    // A direct, off-origin call can fail on the network hop (or CORS); retry through
+    // the relative proxy before giving up. When the base is already same-origin the
+    // retry would be the identical request, so surface the original error instead.
+    if (fullUrl === path) throw err;
     return await fetch(path, authedOptions);
   }
 }
@@ -736,12 +776,10 @@ export async function getBackendHealth(): Promise<{ status: string; modules: str
 
 export async function runPipelineTrace(req: PipelineRunRequest): Promise<PipelineTraceResponse> {
   let productId = req.product_id;
-  let companyId = req.company_id;
   if (!productId) {
     try {
       const prods = await getProducts();
       productId = prods.activeProductId || undefined;
-      companyId = prods.company?.id || undefined;
     } catch {
       // ignore
     }
@@ -750,7 +788,6 @@ export async function runPipelineTrace(req: PipelineRunRequest): Promise<Pipelin
   const payload: PipelineRunRequest = {
     ...req,
     product_id: productId,
-    company_id: companyId,
   };
 
   const res = await apiFetch("/api/tracer/run-pipeline", {
@@ -774,16 +811,13 @@ export async function runPipelineTraceUpload(params: {
   max_accounts_for_buyer_research?: number;
   mode?: "live" | "mock";
   product_id?: string;
-  company_id?: string;
 }): Promise<PipelineTraceResponse> {
   // Auto-resolve product_id if not provided
   let productId = params.product_id;
-  let companyId = params.company_id;
   if (!productId) {
     try {
       const prods = await getProducts();
       productId = prods.activeProductId || undefined;
-      companyId = prods.company?.id || undefined;
     } catch {
       // ignore
     }
@@ -794,7 +828,6 @@ export async function runPipelineTraceUpload(params: {
   if (params.icp_file) form.append("icp_file", params.icp_file);
   if (params.mode) form.append("mode", params.mode);
   if (productId) form.append("product_id", productId);
-  if (companyId) form.append("company_id", companyId);
   if (params.run_verification !== undefined) {
     form.append("run_verification", String(params.run_verification));
   }
@@ -841,7 +874,8 @@ export async function getProducts(companyId?: string): Promise<{
   products: Product[];
 }> {
   try {
-    const res = await apiFetch(`/api/products?company_id=${companyId || mock.mockCompany.id}`, {
+    // company_id is resolved from the bearer token by the backend; the frontend never sends it.
+    const res = await apiFetch("/api/products", {
       cache: "no-store",
     });
     if (res.ok) {
@@ -881,11 +915,11 @@ export async function getProducts(companyId?: string): Promise<{
     isSelected: p.id === activeId,
   }));
 
-  return latency({
+  return mockFallback("getProducts", latency({
     company: { ...mock.mockCompany, activeProductId: activeId },
     activeProductId: activeId,
     products: mapped,
-  });
+  }));
 }
 
 export async function createProduct(payload: CreateProductInput): Promise<Product> {
@@ -895,7 +929,6 @@ export async function createProduct(payload: CreateProductInput): Promise<Produc
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        company_id: payload.companyId || mock.mockCompany.id,
         name: payload.name,
         description: payload.description,
         target_market: payload.targetMarket || "",
@@ -987,7 +1020,7 @@ export async function selectActiveProduct(productId: string, companyId?: string)
     res = await apiFetch(`/api/products/${productId}/select`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company_id: companyId || mock.mockCompany.id }),
+      body: JSON.stringify({}),
     });
   } catch {
     throw new Error("Could not reach the server to switch the active product.");
@@ -1106,7 +1139,7 @@ export async function generateICPFromProduct(payload: GenerateICPInput): Promise
   }
 
   // Fallback high-fidelity ICP generated from product description
-  return latency({
+  return mockFallback("generateICPFromProduct", latency({
     icpName: `${payload.productName} — Enterprise Target Segment`,
     description: `Targeting organizations actively expanding their software operations that face pain points solvable by ${payload.productName}.`,
     companyProfile: {
@@ -1171,7 +1204,7 @@ export async function generateICPFromProduct(payload: GenerateICPInput): Promise
       locations: ["Regions without supported cloud data residency"],
       other: "Organizations with fewer than 10 technical employees",
     },
-  }, 900);
+  }, 900));
 }
 
 export async function saveICP(payload: SaveICPInput): Promise<ICPRecord> {
@@ -1180,7 +1213,6 @@ export async function saveICP(payload: SaveICPInput): Promise<ICPRecord> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        company_id: payload.companyId || mock.mockCompany.id,
         product_id: payload.productId,
         generation_method: payload.generationMethod,
         name: payload.name,
@@ -1199,7 +1231,7 @@ export async function saveICP(payload: SaveICPInput): Promise<ICPRecord> {
 
   const record: ICPRecord = {
     id: "icp_" + Date.now(),
-    companyId: payload.companyId || mock.mockCompany.id,
+    companyId: payload.companyId || "",
     productId: payload.productId,
     generationMethod: payload.generationMethod,
     name: payload.name,
@@ -1210,14 +1242,13 @@ export async function saveICP(payload: SaveICPInput): Promise<ICPRecord> {
     createdAt: new Date().toISOString(),
   };
 
-  return latency(record, 150);
+  return mockFallback("saveICP", latency(record, 150));
 }
 
 export async function uploadICPDocument(file: File, productId?: string, companyId?: string): Promise<any> {
   const form = new FormData();
   form.append("file", file);
   if (productId) form.append("product_id", productId);
-  if (companyId) form.append("company_id", companyId);
 
   try {
     const res = await apiFetch("/api/icp/upload", {
@@ -1231,7 +1262,7 @@ export async function uploadICPDocument(file: File, productId?: string, companyI
     // Fallback
   }
 
-  return latency({
+  return mockFallback("uploadICPDocument", latency({
     status: "success",
     filename: file.name,
     extracted_text_snippet: `Extracted ICP document contents from ${file.name}: Enterprise B2B tech customers with cloud operations.`,
@@ -1248,7 +1279,7 @@ export async function uploadICPDocument(file: File, productId?: string, companyI
       ],
       buyingSignals: ["Upcoming compliance audit", "Active cloud migration"],
     },
-  }, 800);
+  }, 800));
 }
 
 // ── Modular Workflow APIs (Modules 02 to 06) ─────────────────────────

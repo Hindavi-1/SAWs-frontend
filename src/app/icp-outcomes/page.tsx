@@ -1,12 +1,36 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getOutcomeRecords } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
-import { Lightbulb, TrendingDown, TrendingUp } from "lucide-react";
+import type { OutcomeRecord } from "@/lib/types";
+import { Lightbulb, TrendingDown, TrendingUp, Target } from "lucide-react";
 
 export default async function IcpOutcomesPage() {
-  const outcomes = await getOutcomeRecords();
+  let outcomes: OutcomeRecord[] | null = null;
+  try {
+    outcomes = await getOutcomeRecords();
+  } catch {
+    outcomes = null;
+  }
+
+  if (outcomes === null) {
+    return (
+      <div>
+        <PageHeader
+          title="Customer Outcomes & ICP Optimization"
+          description="How closed deals map back to your ICP criteria — where the system learns and suggests refinements."
+        />
+        <EmptyState
+          icon={Target}
+          title="Outcome learning is not available"
+          description="This view has no live backend data source yet, so it stays empty rather than showing sample outcomes that look real."
+        />
+      </div>
+    );
+  }
+
   const won = outcomes.filter((o) => o.outcome === "won");
   const lost = outcomes.filter((o) => o.outcome === "lost");
 

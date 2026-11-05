@@ -226,6 +226,7 @@ export interface OutreachMessage {
   buyerTitle?: string;
   buyerSeniority?: string;
   buyerEmail?: string;
+  buyerEmailStatus?: "verified" | "pattern_deduced" | "public_discovered" | "unresolved";
   buyerLinkedinUrl?: string;
   accountName?: string;
   accountDomain?: string;
@@ -389,7 +390,6 @@ export interface PipelineRunRequest {
   max_accounts_for_buyer_research?: number;
   mode?: "live" | "mock";
   product_id?: string;
-  company_id?: string;
 }
 
 export const PIPELINE_MODULE_ORDER = [

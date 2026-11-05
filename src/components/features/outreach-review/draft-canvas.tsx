@@ -27,7 +27,7 @@ interface DraftCanvasProps {
     draftId: string,
     editedBody: string,
     editedSubject?: string,
-    sendOptions?: { recipientEmail?: string; senderEmail?: string }
+    sendOptions?: { recipientEmail?: string; senderEmail?: string; confirmUnverifiedRecipient?: boolean }
   ) => Promise<void> | void;
   onReject: () => void;
   /** Persist a new From: mailbox so it can be reused on future sends. */
@@ -58,6 +58,13 @@ export function DraftCanvas({
   const [isSending, setIsSending] = React.useState(false);
   const [isAddingSender, setIsAddingSender] = React.useState(false);
   const [newSenderEmail, setNewSenderEmail] = React.useState("");
+
+  // The buyer's address is an unverified, pattern-deduced guess when the backend flagged
+  // it as such and the rep hasn't replaced it with a different address.
+  const recipientIsUnverified =
+    (draft.buyerEmailStatus === "pattern_deduced" || draft.buyerEmailStatus === "unresolved") &&
+    !!draft.buyerEmail &&
+    recipientEmail.trim().toLowerCase() === draft.buyerEmail.trim().toLowerCase();
 
   const handleSubjectChange = (val: string) => {
     setSubject(val);
@@ -116,9 +123,21 @@ export function DraftCanvas({
   };
 
   const handleApproveClick = async () => {
+    // A pattern-deduced address is an inferred guess, not a confirmed mailbox. Make the
+    // rep explicitly acknowledge it before anything is sent.
+    if (recipientIsUnverified) {
+      const ok = window.confirm(
+        `The recipient ${recipientEmail} is unverified — it was inferred from the company's email pattern, not confirmed. Send anyway?`
+      );
+      if (!ok) return;
+    }
     setIsSending(true);
     try {
-      await onApprove(draft.id, body, subject, { recipientEmail, senderEmail });
+      await onApprove(draft.id, body, subject, {
+        recipientEmail,
+        senderEmail,
+        confirmUnverifiedRecipient: recipientIsUnverified,
+      });
     } finally {
       setIsSending(false);
     }
@@ -327,6 +346,17 @@ export function DraftCanvas({
               />
             </div>
           </div>
+
+          {recipientIsUnverified && (
+            <div className="px-5 pb-2.5 flex items-start gap-2 text-[11px] text-caution-500">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-px" />
+              <span>
+                <span className="font-semibold">Unverified recipient. </span>
+                This address was inferred from the company&apos;s email pattern, not found or
+                confirmed. Verify it before sending.
+              </span>
+            </div>
+          )}
 
           {isAddingSender && (
             <div className="px-5 pb-2.5 flex items-center gap-2">

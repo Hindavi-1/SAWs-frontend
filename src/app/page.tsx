@@ -168,6 +168,7 @@ export default function DashboardPage() {
   const [activeProduct, setActiveProduct] = React.useState<Product | null>(null);
   const [products, setProducts] = React.useState<Product[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   const loadAll = React.useCallback(async () => {
     try {
@@ -185,8 +186,11 @@ export default function DashboardPage() {
       setProducts(prods.products);
       const active = prods.products.find((p) => p.isSelected) || prods.products[0] || null;
       setActiveProduct(active);
+      setLoadError(null);
     } catch (err) {
       console.error("Dashboard load error:", err);
+      // Surface the failure instead of quietly showing mock data as if it were real.
+      setLoadError(err instanceof Error ? err.message : "Could not load the dashboard.");
     } finally {
       setLoading(false);
     }
@@ -212,13 +216,39 @@ export default function DashboardPage() {
     };
   }, [loadAll]);
 
-  if (loading || !metrics) {
+  if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-6 w-6 animate-spin text-accent-500" />
           <p className="text-xs text-text-tertiary">Loading dashboard…</p>
         </div>
+      </div>
+    );
+  }
+
+  if (!metrics) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center px-6">
+        <Card className="w-full max-w-md p-6 text-center">
+          <AlertCircle className="mx-auto h-6 w-6 text-risk-500" />
+          <p className="mt-3 text-sm font-semibold text-text-primary">
+            Couldn’t load the dashboard
+          </p>
+          <p className="mt-1.5 text-xs text-text-tertiary">
+            {loadError || "The backend did not respond."}
+          </p>
+          <Button
+            size="sm"
+            className="mt-4"
+            onClick={() => {
+              setLoading(true);
+              loadAll();
+            }}
+          >
+            Retry
+          </Button>
+        </Card>
       </div>
     );
   }

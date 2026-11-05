@@ -171,10 +171,13 @@ export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdat
                       </span>
                     </a>
                     {b.emailStatus === "pattern_deduced" && (
-                      <Info
-                        className="h-3 w-3 shrink-0 text-caution-500"
-                        aria-label="Derived email address"
-                      />
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded-full border border-caution-500/25 bg-caution-500/10 px-1.5 py-0.2 text-[10px] font-medium text-caution-600 dark:text-caution-400"
+                        title="Derived email — generated from the company's email naming pattern, not found publicly. Verify before sending."
+                      >
+                        <Info className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        Unverified
+                      </span>
                     )}
                   </span>
                 )}
