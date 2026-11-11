@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { getProducts, selectActiveProduct, createProduct, saveICP, deleteProduct, deleteCurrentCompany, extractProductFromWebsite } from "@/lib/api";
+import { PlaceAutocomplete } from "@/components/features/place-autocomplete";
 import { useAuth } from "@/components/auth/auth-provider";
 import type { Product, Company } from "@/lib/types";
 import { toast } from "sonner";
@@ -51,6 +52,7 @@ export default function ProductsSettingsPage() {
   const [newProdDesc, setNewProdDesc] = React.useState("");
   const [newTargetMarket, setNewTargetMarket] = React.useState("");
   const [newValProp, setNewValProp] = React.useState("");
+  const [newTargetCities, setNewTargetCities] = React.useState<string[]>([]);
   const [websiteUrl, setWebsiteUrl] = React.useState("");
   const [isFetchingWebsite, setIsFetchingWebsite] = React.useState(false);
   const [createdProductForModal, setCreatedProductForModal] = React.useState<Product | null>(null);
@@ -130,6 +132,7 @@ export default function ProductsSettingsPage() {
           },
           targetPersonas: [{ titles: ["VP of Engineering", "CISO"], seniority: ["C-Level", "VP"] }],
           buyingSignals: ["Active cloud migration", "Hiring security or ops roles"],
+          ...(newTargetCities.length ? { geography: { regionsCities: newTargetCities } } : {}),
         },
       });
 
@@ -146,6 +149,7 @@ export default function ProductsSettingsPage() {
 
       setIsAddOpen(false);
       setCreatedProductForModal(p);
+      setNewTargetCities([]);
       loadData();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create product");
@@ -509,6 +513,14 @@ export default function ProductsSettingsPage() {
                   />
                 </div>
               </div>
+
+              <PlaceAutocomplete
+                value={newTargetCities}
+                onChange={setNewTargetCities}
+                label="Target Cities & Regions"
+                placeholder="Search a city or region, e.g. Hyderabad"
+                helpText="Optional. Pick locations from Google Places so discovery and fit scoring use clean, consistent geography."
+              />
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-subtle">
                 <Button type="button" variant="outline" onClick={() => setIsAddOpen(false)}>

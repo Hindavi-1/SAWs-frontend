@@ -4,12 +4,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card } from "@/components/ui/card";
 import { AccountTable } from "@/components/features/account-table";
 import { AccountPeekDrawer } from "@/components/features/account-peek-drawer";
+import { AccountMap } from "@/components/features/account-map";
 import { HealthBadge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
 import type { Account, FunnelStage } from "@/lib/types";
 import { FUNNEL_STAGES, STAGE_LABELS, reachedStageCount, stageRank } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Kanban, List, Search, Filter, Sparkles, Building2, AlertCircle, Trash2, AlertTriangle } from "lucide-react";
+import { Kanban, List, Map as MapIcon, Search, Filter, Sparkles, Building2, AlertCircle, Trash2, AlertTriangle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import * as React from "react";
@@ -34,7 +35,7 @@ function AccountsPageInner() {
   const [stageOverride, setStageOverride] = React.useState<FunnelStage | "all" | null>(null);
   const [savedView, setSavedView] = React.useState<SavedView>("all");
   const [searchQuery, setSearchQuery] = React.useState("");
-  const [view, setView] = React.useState<"table" | "kanban">("table");
+  const [view, setView] = React.useState<"table" | "kanban" | "map">("table");
 
   // Peek drawer state
   const [peekAccount, setPeekAccount] = React.useState<Account | null>(null);
@@ -130,6 +131,7 @@ function AccountsPageInner() {
             <div className="flex items-center gap-0.5 rounded-[var(--radius-sm)] border border-border-default bg-sunken p-0.5">
               <ToggleBtn icon={List} active={view === "table"} onClick={() => setView("table")} label="Table" />
               <ToggleBtn icon={Kanban} active={view === "kanban"} onClick={() => setView("kanban")} label="Kanban" />
+              <ToggleBtn icon={MapIcon} active={view === "map"} onClick={() => setView("map")} label="Map" />
             </div>
           </div>
         }
@@ -204,7 +206,7 @@ function AccountsPageInner() {
       </div>
 
       {/* Main View Area */}
-      {view === "table" ? (
+      {view === "table" && (
         <Card className="overflow-hidden border-border-default">
           <AccountTable
             accounts={filtered}
@@ -212,7 +214,13 @@ function AccountsPageInner() {
             onDiscardAccount={setDiscardTarget}
           />
         </Card>
-      ) : (
+      )}
+
+      {view === "map" && (
+        <AccountMap accounts={filtered} onSelectAccount={handleSelectAccount} />
+      )}
+
+      {view === "kanban" && (
         <div className="flex gap-3 overflow-x-auto pb-4">
           {FUNNEL_STAGES.map((stage) => {
             const stageAccounts = filtered.filter((a) => a.stage === stage);

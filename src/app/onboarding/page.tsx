@@ -13,6 +13,7 @@ import {
   selectActiveProduct,
   extractProductFromWebsite,
 } from "@/lib/api";
+import { PlaceAutocomplete } from "@/components/features/place-autocomplete";
 import type { ICPGenerationMethod } from "@/lib/types";
 import { toast } from "sonner";
 import {
@@ -84,6 +85,7 @@ export default function OnboardingPage() {
     "Recent funding round or acquisition",
     "Upcoming compliance certification deadline",
   ]);
+  const [targetCities, setTargetCities] = React.useState<string[]>([]);
 
   // Auto-fill the product fields from the company's own website
   const handleFetchFromWebsite = async () => {
@@ -152,6 +154,9 @@ export default function OnboardingPage() {
         if (generated.buyingSignals?.length) {
           setBuyingSignals(generated.buyingSignals);
         }
+        if (generated.geography?.regionsCities?.length) {
+          setTargetCities(generated.geography.regionsCities);
+        }
 
         toast.success("AI synthesized Ideal Customer Profile from your product!", {
           description: "Review and refine the generated parameters below.",
@@ -186,6 +191,9 @@ export default function OnboardingPage() {
         if (canonical.targetPersonas?.length) {
           const titles = canonical.targetPersonas.flatMap((p: any) => p.titles || []);
           if (titles.length) setTargetTitles(titles);
+        }
+        if (canonical.geography?.regionsCities?.length) {
+          setTargetCities(canonical.geography.regionsCities);
         }
         toast.success(`Parsed document: ${file.name}`);
       }
@@ -229,6 +237,7 @@ export default function OnboardingPage() {
           targetPersonas: targetTitles.map((t) => ({ titles: [t], seniority: ["C-Level", "VP"] })),
           problemFit: { primaryProblems: primaryPains },
           buyingSignals,
+          ...(targetCities.length ? { geography: { regionsCities: targetCities } } : {}),
         },
         rawDocumentText: extractedSnippet || undefined,
       });
@@ -668,6 +677,14 @@ export default function OnboardingPage() {
                     className="w-full rounded-md border border-border-default bg-sunken/40 px-3 py-1.5 text-xs text-text-primary focus:border-accent-500 focus:outline-none"
                   />
                 </div>
+
+                <PlaceAutocomplete
+                  value={targetCities}
+                  onChange={setTargetCities}
+                  label="Target Cities & Regions"
+                  placeholder="Search a city or region, e.g. Hyderabad"
+                  helpText="Pick locations from Google Places so discovery and fit scoring use clean, consistent geography."
+                />
               </div>
             </Card>
           )}
@@ -753,6 +770,14 @@ export default function OnboardingPage() {
                   className="w-full rounded-md border border-border-default bg-sunken/40 px-3 py-1.5 text-xs text-text-primary focus:border-accent-500 focus:outline-none"
                 />
               </div>
+
+              <PlaceAutocomplete
+                value={targetCities}
+                onChange={setTargetCities}
+                label="Target Cities & Regions"
+                placeholder="Search a city or region, e.g. Bengaluru"
+                helpText="Pick locations from Google Places so discovery and fit scoring use clean, consistent geography."
+              />
             </Card>
           )}
 
@@ -921,6 +946,12 @@ export default function OnboardingPage() {
                     <span className="font-semibold text-text-primary">Personas: </span>
                     {targetTitles.join(", ")}
                   </div>
+                  {targetCities.length > 0 && (
+                    <div>
+                      <span className="font-semibold text-text-primary">Target Cities: </span>
+                      {targetCities.join(", ")}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

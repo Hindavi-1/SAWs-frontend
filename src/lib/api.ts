@@ -122,6 +122,26 @@ export async function getDashboardMetrics(productId?: string): Promise<Dashboard
   };
 }
 
+/**
+ * Map the Google Places location columns returned by the backend onto the UI
+ * `Account` shape. Absent columns map to `undefined` so components can simply
+ * check for the presence of a value.
+ */
+function mapPlacesLocation(a: any): Pick<
+  Account,
+  "placeId" | "latitude" | "longitude" | "formattedAddress" | "phone" | "businessStatus" | "mapsUrl"
+> {
+  return {
+    placeId: a.place_id || undefined,
+    latitude: a.latitude != null ? Number(a.latitude) : undefined,
+    longitude: a.longitude != null ? Number(a.longitude) : undefined,
+    formattedAddress: a.formatted_address || undefined,
+    phone: a.phone || undefined,
+    businessStatus: a.business_status || undefined,
+    mapsUrl: a.maps_url || undefined,
+  };
+}
+
 export async function getAccounts(productId?: string): Promise<Account[]> {
   try {
     if (!productId) {
@@ -174,6 +194,7 @@ export async function getAccounts(productId?: string): Promise<Account[]> {
             discoveryReasons: a.match_reasons || [],
             tags: [],
             verificationStatus: a.verification_status || (stage === "verified" ? "verified" : "unverified"),
+            ...mapPlacesLocation(a),
           };
         });
       }
@@ -231,6 +252,7 @@ export async function getAccount(id: string): Promise<Account | undefined> {
           discoveryReasons: a.match_reasons || [],
           tags: [],
           verificationStatus: a.verification_status || (stage === "verified" ? "verified" : "unverified"),
+          ...mapPlacesLocation(a),
         };
       }
     }
@@ -1467,6 +1489,7 @@ export async function runDiscovery(params: {
         lastActivityAt: a.updated_at || new Date().toISOString(),
         discoveryReasons: a.match_reasons || [],
         tags: [],
+        ...mapPlacesLocation(a),
       };
     });
     return { accounts, pipelineJobId };
@@ -1581,6 +1604,46 @@ export async function getDatabaseDump(): Promise<DatabaseDump> {
     throw await authError(res, `Failed to load database dump (${res.status})`);
   }
   return (await res.json()) as DatabaseDump;
+}
+
+// ── Google Places (city / region autocomplete via backend proxy) ────
+// The browser never holds the Places API key: autocomplete is proxied through
+// the backend, which owns the server-side key.
+
+export interface PlaceSuggestion {
+  description: string;
+  place_id: string;
+  main_text: string;
+  secondary_text: string;
+}
+
+export async function getPlacesAutocomplete(q: string, limit = 5): Promise<PlaceSuggestion[]> {
+  if (!q.trim()) return [];
+  try {
+    const res = await apiFetch(
+      `/api/places/autocomplete?q=${encodeURIComponent(q)}&limit=${limit}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data.suggestions) ? data.suggestions : [];
+  } catch {
+    // Autocomplete is a convenience — a failure must not break the form.
+    return [];
+  }
+}
+
+export async function getPlacesStatus(): Promise<{ placesEnabled: boolean; provider: string }> {
+  try {
+    const res = await apiFetch("/api/places/status", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      return { placesEnabled: !!data.places_enabled, provider: data.provider || "" };
+    }
+  } catch {
+    // ignore — treated as "not available"
+  }
+  return { placesEnabled: false, provider: "" };
 }
 
 

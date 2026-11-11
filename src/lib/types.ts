@@ -133,6 +133,15 @@ export interface Account {
   discoveryReasons: string[];
   tags: string[];
   verificationStatus?: string;
+  // Google Places location data — present when the account was found or verified
+  // via Google Places, and used for the map view / detail mini-map.
+  placeId?: string;
+  latitude?: number;
+  longitude?: number;
+  formattedAddress?: string;
+  phone?: string;
+  businessStatus?: string;
+  mapsUrl?: string;
 }
 
 export interface EvidenceItem {

@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import type { Account, EvidenceItem, Buyer, QualificationCriterion, OutreachMessage } from "@/lib/types";
 import { CircleCheck, Circle, Sparkles, Database, FileText, CheckCircle2 } from "lucide-react";
 import { timeAgo } from "@/lib/utils";
+import { AccountLocationCard } from "./account-location-card";
 
 interface AccountOverviewTabProps {
   account: Account;
@@ -65,6 +66,9 @@ export function AccountOverviewTab({
           ))}
         </div>
       </Card>
+
+      {/* Location (Google Places) — address, phone and a small map */}
+      <AccountLocationCard key={account.id} account={account} />
 
       {/* Why this account is a fit */}
       <Card className="p-4 border-border-default">

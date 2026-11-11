@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import { AccountCard } from "@/components/features/account-card";
 import { AccountPeekDrawer } from "@/components/features/account-peek-drawer";
 import { EvidenceList } from "@/components/features/evidence-list";
+import { PlaceAutocomplete } from "@/components/features/place-autocomplete";
 import { ConfidenceBadge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
 import type { Account, IcpDefinition } from "@/lib/types";
-import { CheckCircle2, Loader2, Play, Sparkles, Table2, LayoutGrid, FileText, UploadCloud, Trash2, FileUp } from "lucide-react";
+import { CheckCircle2, Loader2, Play, Sparkles, Table2, LayoutGrid, FileText, UploadCloud, Trash2, FileUp, MapPin, X } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import * as React from "react";
+import * as ReactDOM from "react-dom";
 
 const RUN_STEPS = ["Scanning data sources", "Scoring ICP fit", "Verifying signals", "Ranking results"];
 
@@ -53,6 +55,9 @@ function DiscoveryPageInner() {
   // separately from the discovery request itself.
   const [pipelineJob, setPipelineJob] = React.useState<api.PipelineJob | null>(null);
   const [isRetrying, setIsRetrying] = React.useState(false);
+  // Location is collected at run time when the resolved ICP does not specify one.
+  const [locationModalOpen, setLocationModalOpen] = React.useState(false);
+  const [pendingRun, setPendingRun] = React.useState<{ icp: any; icpId?: string } | null>(null);
 
   const loadInitialData = React.useCallback(async () => {
     const loadedIcps = await api.getIcps();
@@ -229,7 +234,85 @@ function DiscoveryPageInner() {
     })();
   }, []);
 
+  /** Resolve the ICP payload for the current mode (async for uploads). */
+  async function resolveRunIcp(): Promise<{ icp: any; icpId?: string }> {
+    if (icpMode === "existing" && selectedIcp) {
+      return { icp: selectedIcp.rawCriteria, icpId: selectedIcp.id };
+    }
+    if (icpMode === "upload" && uploadedFile) {
+      const uploadResult = await api.uploadICPDocument(uploadedFile);
+      return { icp: uploadResult?.canonical_icp };
+    }
+    if (icpText) {
+      return {
+        icp: {
+          icpName: "Custom Target Segment",
+          description: icpText,
+          companyProfile: {
+            industries: ["Technology", "Software", "Enterprise Services"],
+            employeeRange: { min: 100, max: 2000 },
+          },
+          targetPersonas: [
+            { titles: ["VP", "Director", "Head of Sales", "CTO"], seniority: ["VP", "Director"], decision_maker_type: "Economic Buyer" }
+          ],
+          buyingSignals: ["Active software evaluation", "Modern cloud operations"],
+        },
+      };
+    }
+    return { icp: undefined };
+  }
+
+  /** True when the ICP already constrains where to look (country or city / region). */
+  function icpHasGeography(icp: any): boolean {
+    const geo = icp?.geography;
+    const countries = Array.isArray(geo?.countries) ? geo.countries : [];
+    const cities = Array.isArray(geo?.regionsCities) ? geo.regionsCities : [];
+    return countries.length > 0 || cities.length > 0;
+  }
+
+  /**
+   * Click handler for "Start Discovery Run". Resolves the ICP first; when it does
+   * not specify a location, a modal collects one (applied to this run only).
+   */
   async function startRun() {
+    try {
+      const resolved = await resolveRunIcp();
+      if (!icpHasGeography(resolved.icp)) {
+        setPendingRun(resolved);
+        setLocationModalOpen(true);
+        return;
+      }
+      await executeRun(resolved);
+    } catch (err) {
+      console.error("Discovery run failed:", err);
+      toast.error("Account discovery run failed", {
+        description: err instanceof Error ? err.message : undefined,
+      });
+    }
+  }
+
+  /** Inject the locations picked in the modal and continue the run. */
+  function handleLocationConfirm(locations: string[]) {
+    const pending = pendingRun;
+    setLocationModalOpen(false);
+    setPendingRun(null);
+    if (!pending) return;
+    const icp = {
+      ...(pending.icp || {}),
+      geography: { ...((pending.icp || {}).geography || {}), regionsCities: locations },
+    };
+    executeRun({ ...pending, icp });
+  }
+
+  /** Continue with the backend's default geography (no location injected). */
+  function handleLocationUseDefault() {
+    const pending = pendingRun;
+    setLocationModalOpen(false);
+    setPendingRun(null);
+    if (pending) executeRun(pending);
+  }
+
+  async function executeRun(resolved: { icp: any; icpId?: string }) {
     setRunState("running");
     setRunStep(0);
     setPipelineJob(null);
@@ -238,35 +321,10 @@ function DiscoveryPageInner() {
     }, 1200);
 
     try {
-      let result: api.DiscoveryRunResult = { accounts: [], pipelineJobId: null };
-      if (icpMode === "existing" && selectedIcp) {
-        result = await api.runDiscovery({
-          icpId: selectedIcp.id,
-          icp: selectedIcp.rawCriteria,
-        });
-      } else if (icpMode === "upload" && uploadedFile) {
-        const uploadResult = await api.uploadICPDocument(uploadedFile);
-        if (uploadResult && uploadResult.canonical_icp) {
-          result = await api.runDiscovery({
-            icp: uploadResult.canonical_icp,
-          });
-        }
-      } else if (icpText) {
-        result = await api.runDiscovery({
-          icp: {
-            icpName: "Custom Target Segment",
-            description: icpText,
-            companyProfile: {
-              industries: ["Technology", "Software", "Enterprise Services"],
-              employeeRange: { min: 100, max: 2000 },
-            },
-            targetPersonas: [
-              { titles: ["VP", "Director", "Head of Sales", "CTO"], seniority: ["VP", "Director"], decision_maker_type: "Economic Buyer" }
-            ],
-            buyingSignals: ["Active software evaluation", "Modern cloud operations"]
-          }
-        });
-      }
+      const result = await api.runDiscovery({
+        icpId: resolved.icpId,
+        icp: resolved.icp,
+      });
 
       const newlyDiscovered = result.accounts;
       if (newlyDiscovered.length > 0) {
@@ -775,7 +833,103 @@ function DiscoveryPageInner() {
         open={!!activeAccount}
         onClose={() => setActiveAccount(null)}
       />
+
+      <LocationPickerModal
+        open={locationModalOpen}
+        onClose={() => {
+          setLocationModalOpen(false);
+          setPendingRun(null);
+        }}
+        onConfirm={handleLocationConfirm}
+        onUseDefault={handleLocationUseDefault}
+      />
     </div>
+  );
+}
+
+/**
+ * Collects target cities / regions when the resolved ICP does not specify a
+ * location. The chosen values are applied to this discovery run only — the
+ * stored ICP document is never modified.
+ */
+function LocationPickerModal({
+  open,
+  onClose,
+  onConfirm,
+  onUseDefault,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (locations: string[]) => void;
+  onUseDefault: () => void;
+}) {
+  const [locations, setLocations] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (open) setLocations([]);
+  }, [open]);
+
+  if (!open || typeof document === "undefined") return null;
+
+  return ReactDOM.createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-[var(--radius-md)] border border-border-default bg-canvas shadow-[var(--shadow-lg)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-accent-500" />
+            <h3 className="text-sm font-semibold text-text-primary">Where should we search?</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-[var(--radius-sm)] p-1 text-text-tertiary hover:bg-sunken hover:text-text-primary"
+            aria-label="Close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+        <div className="space-y-3 px-4 py-3">
+          <p className="text-xs leading-relaxed text-text-secondary">
+            This ICP does not specify a target location. Add one or more cities / regions so
+            discovery and fit scoring search the right geography. This applies to this run only.
+          </p>
+          <PlaceAutocomplete
+            value={locations}
+            onChange={setLocations}
+            label="Target Cities & Regions"
+            placeholder="Search a city or region, e.g. Hyderabad"
+            helpText="Pick from Google Places suggestions, or press Enter to add your own."
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-border-subtle px-4 py-3">
+          <Button variant="ghost" size="sm" onClick={onUseDefault}>
+            Use backend default
+          </Button>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => onConfirm(locations)}
+              disabled={locations.length === 0}
+            >
+              Continue run
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 
