@@ -25,6 +25,114 @@ function hasRealFitScore(account: Account): boolean {
   return account.stage !== "discovered" && account.stage !== "verified";
 }
 
+/** Deduplicate a list of scalars/objects, dropping empties. */
+function uniqueList(values: any[]): any[] {
+  const seen = new Set<string>();
+  const out: any[] = [];
+  for (const v of values) {
+    if (v === null || v === undefined || v === "") continue;
+    const key = typeof v === "string" ? v : JSON.stringify(v);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
+}
+
+/** Render one segment's Canonical ICP into the human-readable description lines. */
+function renderSegmentText(icp: any, fallbackName?: string): string[] {
+  const parts: string[] = [];
+  if (icp.icpName || icp.description) {
+    parts.push(`Target Segment: ${icp.icpName || fallbackName || "Target Segment"}`);
+    if (icp.description) parts.push(icp.description);
+  }
+  const industries = icp.companyProfile?.industries;
+  if (Array.isArray(industries) && industries.length) {
+    parts.push(`Industries: ${industries.join(", ")}`);
+  }
+  const emp = icp.companyProfile?.employeeRange;
+  if (emp && (typeof emp.min === "number" || typeof emp.max === "number")) {
+    parts.push(`Company Size: ${emp.min ?? "?"}–${emp.max ?? "?"} employees`);
+  }
+  const geoParts = [
+    ...(Array.isArray(icp.geography?.regionsCities) ? icp.geography.regionsCities : []),
+    ...(Array.isArray(icp.geography?.countries) ? icp.geography.countries : []),
+  ].filter(Boolean);
+  if (geoParts.length) {
+    parts.push(`Geography: ${geoParts.join(", ")}`);
+  }
+  const problems = icp.problemFit?.primaryProblems;
+  if (Array.isArray(problems) && problems.length) {
+    parts.push(`Problems we solve for them: ${problems.join("; ")}`);
+  }
+  const titles = (Array.isArray(icp.targetPersonas) ? icp.targetPersonas : [])
+    .flatMap((p: any) => p?.titles || [])
+    .filter(Boolean);
+  if (titles.length) parts.push(`Target Personas: ${titles.join(", ")}`);
+  if (Array.isArray(icp.buyingSignals) && icp.buyingSignals.length) {
+    parts.push(`Buying Signals: ${icp.buyingSignals.join("; ")}`);
+  }
+  return parts;
+}
+
+/**
+ * Union several per-segment ICPs into one Canonical ICP so a single discovery
+ * run searches across every target segment (e.g. individuals AND banks).
+ */
+function mergeSegmentIcps(segments: any[]): any {
+  if (segments.length === 1) return segments[0];
+  const collect = (pick: (icp: any) => any) =>
+    uniqueList(segments.flatMap((s) => (Array.isArray(pick(s)) ? pick(s) : [])));
+  const mins = segments
+    .map((s) => s?.companyProfile?.employeeRange?.min)
+    .filter((v) => typeof v === "number");
+  const maxs = segments
+    .map((s) => s?.companyProfile?.employeeRange?.max)
+    .filter((v) => typeof v === "number");
+  const customerTypes = uniqueList(segments.map((s) => s?.customerType));
+  return {
+    icpName: segments.map((s) => s?.icpName).filter(Boolean).join(" / ") || "Combined Target Segments",
+    description: segments.map((s) => s?.description).filter(Boolean).join(" "),
+    customerType: customerTypes.length > 1 ? "B2B2C" : customerTypes[0],
+    companyProfile: {
+      industries: collect((s) => s?.companyProfile?.industries),
+      subIndustries: collect((s) => s?.companyProfile?.subIndustries),
+      businessModels: collect((s) => s?.companyProfile?.businessModels),
+      companyStages: collect((s) => s?.companyProfile?.companyStages),
+      employeeRange:
+        mins.length || maxs.length
+          ? {
+              min: mins.length ? Math.min(...mins) : undefined,
+              max: maxs.length ? Math.max(...maxs) : undefined,
+            }
+          : undefined,
+    },
+    geography: {
+      countries: collect((s) => s?.geography?.countries),
+      regionsCities: collect((s) => s?.geography?.regionsCities),
+    },
+    problemFit: {
+      primaryProblems: collect((s) => s?.problemFit?.primaryProblems),
+      useCases: collect((s) => s?.problemFit?.useCases),
+      businessImpact: segments
+        .map((s) => s?.problemFit?.businessImpact)
+        .filter(Boolean)
+        .join(" "),
+    },
+    targetPersonas: segments.flatMap((s) =>
+      Array.isArray(s?.targetPersonas) ? s.targetPersonas : []
+    ),
+    buyingSignals: collect((s) => s?.buyingSignals),
+    consumerProfile: {
+      personas: collect((s) => s?.consumerProfile?.personas),
+      characteristics: collect((s) => s?.consumerProfile?.characteristics),
+      financialNeeds: collect((s) => s?.consumerProfile?.financialNeeds),
+      behaviors: collect((s) => s?.consumerProfile?.behaviors),
+    },
+    exclusions: segments[0]?.exclusions,
+  };
+}
+
 export default function DiscoveryPage() {
   return (
     <React.Suspense fallback={null}>
@@ -58,6 +166,12 @@ function DiscoveryPageInner() {
   // Location is collected at run time when the resolved ICP does not specify one.
   const [locationModalOpen, setLocationModalOpen] = React.useState(false);
   const [pendingRun, setPendingRun] = React.useState<{ icp: any; icpId?: string } | null>(null);
+  // The structured Canonical ICP produced by "Auto-Generate from Active Product",
+  // plus the exact text it was rendered to. As long as the text is untouched we
+  // run against the structured ICP (which carries geography, industries and
+  // personas) instead of re-deriving it — or falling back to a generic segment.
+  const [structuredIcp, setStructuredIcp] = React.useState<any | null>(null);
+  const [structuredText, setStructuredText] = React.useState<string>("");
 
   const loadInitialData = React.useCallback(async () => {
     const loadedIcps = await api.getIcps();
@@ -116,39 +230,32 @@ function DiscoveryPageInner() {
       });
 
       if (canonical) {
-        const parts: string[] = [];
-        if (canonical.icpName || canonical.description) {
-          parts.push(`Target Segment: ${canonical.icpName || activeProd.name}`);
-          parts.push(canonical.description || activeProd.description);
-        }
-        if (canonical.companyProfile?.industries?.length) {
-          parts.push(`Industries: ${canonical.companyProfile.industries.join(", ")}`);
-        }
-        if (canonical.companyProfile?.employeeRange) {
-          parts.push(
-            `Company Size: ${canonical.companyProfile.employeeRange.min}–${canonical.companyProfile.employeeRange.max} employees`
-          );
-        }
-        if (canonical.targetPersonas?.length) {
-          const titles = canonical.targetPersonas
-            .flatMap((p: any) => p.titles || [])
-            .filter(Boolean)
-            .join(", ");
-          if (titles) parts.push(`Target Personas: ${titles}`);
-        }
-        if (canonical.buyingSignals?.length) {
-          parts.push(`Buying Signals: ${canonical.buyingSignals.join("; ")}`);
-        }
+        // The backend returns one ICP per detected customer segment. Present
+        // all of them (e.g. individual investors AND banks) rather than only
+        // the first, and run across the union of their targeting attributes.
+        const allSegments: any[] =
+          Array.isArray(canonical.canonical_icps) && canonical.canonical_icps.length > 0
+            ? canonical.canonical_icps
+            : [canonical];
 
+        const parts = allSegments.flatMap((seg) => renderSegmentText(seg, activeProd.name));
         const formattedText =
           parts.length > 0
             ? parts.join("\n\n")
-            : `Targeting B2B organizations in need of ${activeProd.name}: ${activeProd.description}`;
+            : `Targeting organizations in need of ${activeProd.name}: ${activeProd.description}`;
 
         setIcpText(formattedText);
-        toast.success(`ICP description auto-generated from product "${activeProd.name}"!`);
+        // Keep the structured ICP so the run uses it verbatim (preserving the
+        // geography and customer profile the LLM derived from the product).
+        setStructuredIcp(allSegments.length > 1 ? mergeSegmentIcps(allSegments) : allSegments[0]);
+        setStructuredText(formattedText);
+        toast.success(
+          allSegments.length > 1
+            ? `ICP auto-generated from "${activeProd.name}" — ${allSegments.length} target segments combined.`
+            : `ICP description auto-generated from product "${activeProd.name}"!`
+        );
       } else {
-        setIcpText(`Targeting B2B organizations for ${activeProd.name}: ${activeProd.description}`);
+        setIcpText(`Targeting organizations for ${activeProd.name}: ${activeProd.description}`);
         toast.success("ICP description generated from active product.");
       }
     } catch (err) {
@@ -244,6 +351,20 @@ function DiscoveryPageInner() {
       return { icp: uploadResult?.canonical_icp };
     }
     if (icpText) {
+      // Reuse the structured ICP already generated from the product when the
+      // user has not edited the text — it carries the geography, industries and
+      // personas a raw-text run would otherwise lose.
+      if (structuredIcp && structuredText === icpText) {
+        return { icp: structuredIcp };
+      }
+      // Structure the free-text description so geography and targeting come from
+      // what the user actually wrote, instead of a generic placeholder that
+      // ignores the description entirely.
+      const parsed = await api.parseICP(icpText);
+      if (parsed) {
+        return { icp: parsed };
+      }
+      // Parsing unavailable — fall back to a generic segment for this text.
       return {
         icp: {
           icpName: "Custom Target Segment",
@@ -583,7 +704,11 @@ function DiscoveryPageInner() {
                 <span className="font-mono">{icpText.length} characters</span>
                 <button
                   type="button"
-                  onClick={() => setIcpText("")}
+                  onClick={() => {
+                    setIcpText("");
+                    setStructuredIcp(null);
+                    setStructuredText("");
+                  }}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 font-semibold text-text-tertiary transition-colors hover:bg-sunken hover:text-risk-500"
                 >
                   <Trash2 className="h-3 w-3" />

@@ -31,7 +31,7 @@ export default async function ActionsPage() {
                 Module 07 · Human-in-the-Loop Showpiece
               </span>
               <span className="rounded-full bg-accent-500 text-white px-1.5 py-0.2 text-[10px] font-bold font-mono">
-                {outreachApprovals.length || 3} Pending
+                {outreachApprovals.length} Pending
               </span>
             </div>
             <p className="text-sm font-bold text-text-primary mt-0.5">

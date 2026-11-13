@@ -113,6 +113,15 @@ export function AccountBuyersTab({ buyers, accountName, accountId, onBuyersUpdat
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-text-primary">{b.name}</p>
+                    {b.isPlaceholder && (
+                      <span
+                        className="inline-flex items-center gap-0.5 rounded-full border border-caution-500/25 bg-caution-500/10 px-1.5 py-0.2 text-[10px] font-medium text-caution-600 dark:text-caution-400"
+                        title="No named decision maker was found for this account. This is a role-based placeholder, not a real person — reach out by phone first."
+                      >
+                        <Info className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        Placeholder
+                      </span>
+                    )}
                     <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-sunken border border-border-subtle text-text-tertiary">
                       {b.seniority}
                     </span>

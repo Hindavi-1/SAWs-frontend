@@ -41,8 +41,8 @@ function AccountsPageInner() {
   const [peekAccount, setPeekAccount] = React.useState<Account | null>(null);
   const [drawerOpen, setDrawerOpen] = React.useState(false);
 
-  // Discard state
-  const [discardTarget, setDiscardTarget] = React.useState<Account | null>(null);
+  // Discard state — holds one account (row action) or many (bulk action).
+  const [discardTargets, setDiscardTargets] = React.useState<Account[]>([]);
   const [isDiscarding, setIsDiscarding] = React.useState(false);
 
   const loadAccounts = React.useCallback(() => {
@@ -66,21 +66,40 @@ function AccountsPageInner() {
   };
 
   const handleConfirmDiscard = async () => {
-    if (!discardTarget) return;
+    if (discardTargets.length === 0) return;
     setIsDiscarding(true);
     try {
-      await api.discardAccount(discardTarget.id);
-      toast.success(`"${discardTarget.name}" discarded`, {
-        description: "It has been removed from the pipeline and all tabs.",
-      });
-      setAccounts((prev) => prev.filter((a) => a.id !== discardTarget.id));
-      if (peekAccount?.id === discardTarget.id) {
+      const targets = discardTargets;
+      const removed: string[] = [];
+      const failed: string[] = [];
+      for (const target of targets) {
+        try {
+          await api.discardAccount(target.id);
+          removed.push(target.id);
+        } catch {
+          failed.push(target.name);
+        }
+      }
+      setAccounts((prev) => prev.filter((a) => !removed.includes(a.id)));
+      if (peekAccount && removed.includes(peekAccount.id)) {
         setDrawerOpen(false);
         setPeekAccount(null);
       }
-      setDiscardTarget(null);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to discard account");
+      if (failed.length === 0) {
+        toast.success(
+          targets.length === 1 ? `"${targets[0].name}" discarded` : `${removed.length} accounts discarded`,
+          { description: "Removed from the pipeline and all tabs." }
+        );
+      } else if (removed.length === 0) {
+        toast.error(
+          failed.length === 1 ? `Failed to discard "${failed[0]}"` : `Failed to discard ${failed.length} accounts`
+        );
+      } else {
+        toast.error(`${removed.length} discarded, ${failed.length} failed`, {
+          description: `Could not discard: ${failed.join(", ")}`,
+        });
+      }
+      setDiscardTargets([]);
     } finally {
       setIsDiscarding(false);
     }
@@ -211,7 +230,8 @@ function AccountsPageInner() {
           <AccountTable
             accounts={filtered}
             onSelectAccount={handleSelectAccount}
-            onDiscardAccount={setDiscardTarget}
+            onDiscardAccount={(acc) => setDiscardTargets([acc])}
+            onBulkDiscard={(accs) => setDiscardTargets(accs)}
           />
         </Card>
       )}
@@ -256,7 +276,7 @@ function AccountsPageInner() {
                               aria-label={`Discard ${a.name}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setDiscardTarget(a);
+                                setDiscardTargets([a]);
                               }}
                               className="inline-flex h-5 w-5 items-center justify-center rounded text-text-tertiary transition-colors hover:bg-risk-500/10 hover:text-risk-500"
                             >
@@ -287,7 +307,7 @@ function AccountsPageInner() {
       />
 
       {/* Discard confirmation */}
-      {discardTarget && typeof document !== "undefined" &&
+      {discardTargets.length > 0 && typeof document !== "undefined" &&
         createPortal(
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
             <Card className="w-full max-w-md border-risk-500/40 bg-raised p-5 shadow-2xl space-y-4">
@@ -296,11 +316,25 @@ function AccountsPageInner() {
                   <AlertTriangle className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-text-primary">Discard account?</h3>
+                  <h3 className="text-base font-bold text-text-primary">
+                    {discardTargets.length === 1
+                      ? "Discard account?"
+                      : `Discard ${discardTargets.length} accounts?`}
+                  </h3>
                   <p className="mt-1 text-xs text-text-secondary">
-                    <strong>{discardTarget.name}</strong> will be permanently removed from the
-                    pipeline and every tab (dashboard, buyers, research and outreach). This cannot
-                    be undone.
+                    {discardTargets.length === 1 ? (
+                      <>
+                        <strong>{discardTargets[0].name}</strong> will be permanently removed from the
+                        pipeline and every tab (dashboard, buyers, research and outreach). This cannot
+                        be undone.
+                      </>
+                    ) : (
+                      <>
+                        <strong>{discardTargets.length} selected accounts</strong> will be permanently
+                        removed from the pipeline and every tab (dashboard, buyers, research and
+                        outreach). This cannot be undone.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -308,7 +342,7 @@ function AccountsPageInner() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setDiscardTarget(null)}
+                  onClick={() => setDiscardTargets([])}
                   disabled={isDiscarding}
                 >
                   Cancel
@@ -321,7 +355,11 @@ function AccountsPageInner() {
                   className="gap-1.5"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                  <span>Discard Account</span>
+                  <span>
+                    {discardTargets.length === 1
+                      ? "Discard Account"
+                      : `Discard ${discardTargets.length} Accounts`}
+                  </span>
                 </Button>
               </div>
             </Card>

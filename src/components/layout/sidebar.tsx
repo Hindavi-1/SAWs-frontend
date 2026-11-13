@@ -54,21 +54,24 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(false);
   const [badgeCounts, setBadgeCounts] = React.useState<{ outreach: number; actions: number }>({
-    outreach: 3,
-    actions: 4,
+    outreach: 0,
+    actions: 0,
   });
 
   React.useEffect(() => {
-    Promise.all([api.getApprovalQueue(), api.getAccounts()]).then(([queue]) => {
-      const outreachItems = queue.filter((item) => item.kind === "outreach_email");
-      const otherActions = queue.filter((item) => item.kind !== "outreach_email");
-      setBadgeCounts({
-        outreach: outreachItems.length || 3, // fallback to active queue sample
-        actions: otherActions.length,
+    api
+      .getApprovalQueue()
+      .then((queue) => {
+        // Both badges are derived from the live approval queue: outreach drafts feed
+        // the Outreach Review tab, every other approval kind feeds the Action Queue tab.
+        setBadgeCounts({
+          outreach: queue.filter((item) => item.kind === "outreach_email").length,
+          actions: queue.filter((item) => item.kind !== "outreach_email").length,
+        });
+      })
+      .catch(() => {
+        // Leave both badges at zero when the queue cannot be loaded.
       });
-    }).catch(() => {
-      // Graceful fallback
-    });
   }, []);
 
   return (

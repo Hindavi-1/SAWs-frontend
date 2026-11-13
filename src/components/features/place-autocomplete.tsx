@@ -15,6 +15,19 @@ interface PlaceAutocompleteProps {
   className?: string;
 }
 
+// Google Places autocomplete bills per keystroke request unless the requests are
+// grouped into a "session" with a shared token. Below this length the text is
+// too ambiguous to be worth a billable call, so we wait for the user to type a
+// little more.
+const MIN_QUERY_LENGTH = 3;
+
+function createSessionToken(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 /**
  * City / region input backed by Google Places autocomplete (through the backend
  * proxy, so the server-side key never reaches the browser). Values are picked
@@ -36,6 +49,9 @@ export function PlaceAutocomplete({
   const [highlight, setHighlight] = React.useState(0);
   const boxRef = React.useRef<HTMLDivElement>(null);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A fresh token per lookup session; regenerated after each selection so the
+  // next search starts a new (separately billed) session.
+  const sessionTokenRef = React.useRef<string>(createSessionToken());
 
   React.useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -51,14 +67,16 @@ export function PlaceAutocomplete({
   const runSearch = (raw: string) => {
     setQuery(raw);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!raw.trim()) {
+    // Below the minimum length the input is too ambiguous to justify a paid
+    // Places call, so nothing is fetched until the user types a bit more.
+    if (raw.trim().length < MIN_QUERY_LENGTH) {
       setSuggestions([]);
       setOpen(false);
       return;
     }
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
-      const results = await getPlacesAutocomplete(raw, 6);
+      const results = await getPlacesAutocomplete(raw, 6, sessionTokenRef.current);
       setSuggestions(results);
       setHighlight(0);
       setOpen(results.length > 0);
@@ -75,6 +93,8 @@ export function PlaceAutocomplete({
     setQuery("");
     setSuggestions([]);
     setOpen(false);
+    // The lookup session is complete — start a new token for the next search.
+    sessionTokenRef.current = createSessionToken();
   };
 
   const removeLocation = (loc: string) => onChange(value.filter((v) => v !== loc));

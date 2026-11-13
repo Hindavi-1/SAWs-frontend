@@ -25,15 +25,28 @@ interface AccountTableProps {
   onSelectAccount?: (account: Account) => void;
   /** When provided, a discard action is shown per row. */
   onDiscardAccount?: (account: Account) => void;
+  /** When provided, a bulk discard action is shown for the selected rows. */
+  onBulkDiscard?: (accounts: Account[]) => void;
 }
 
 type SortField = "name" | "fitScore" | "stage" | "daysInStage" | "discoveredAt";
 type SortOrder = "asc" | "desc";
 
-export function AccountTable({ accounts, onSelectAccount, onDiscardAccount }: AccountTableProps) {
+export function AccountTable({ accounts, onSelectAccount, onDiscardAccount, onBulkDiscard }: AccountTableProps) {
   const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
   const [sortField, setSortField] = React.useState<SortField>("fitScore");
   const [sortOrder, setSortOrder] = React.useState<SortOrder>("desc");
+
+  // Drop selections that no longer exist (e.g. after a bulk discard) so the
+  // toolbar does not linger on rows that are already gone.
+  React.useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const live = new Set(accounts.map((a) => a.id));
+      const next = new Set([...prev].filter((id) => live.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [accounts]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -117,6 +130,17 @@ export function AccountTable({ accounts, onSelectAccount, onDiscardAccount }: Ac
             >
               <Send className="h-3 w-3" /> Queue Outreach
             </Button>
+            {onBulkDiscard && (
+              <Button
+                size="xs"
+                variant="danger"
+                onClick={() =>
+                  onBulkDiscard(sortedAccounts.filter((a) => selectedIds.has(a.id)))
+                }
+              >
+                <Trash2 className="h-3 w-3" /> Discard
+              </Button>
+            )}
             <Button
               size="xs"
               variant="ghost"

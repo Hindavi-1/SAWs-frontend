@@ -26,7 +26,10 @@ import {
   Loader2,
   Users,
   Target,
+  Globe,
+  Wand2,
 } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 
 const REFRESH_INTERVAL_MS = 30_000; // 30 seconds
@@ -36,8 +39,36 @@ function RegisterProductScreen({ onCreated }: { onCreated: () => void }) {
   const [description, setDescription] = React.useState("");
   const [targetMarket, setTargetMarket] = React.useState("");
   const [valueProposition, setValueProposition] = React.useState("");
+  const [websiteUrl, setWebsiteUrl] = React.useState("");
+  const [isFetchingWebsite, setIsFetchingWebsite] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  // Auto-fill the product fields from the company's own website
+  const handleFetchFromWebsite = async () => {
+    const url = websiteUrl.trim();
+    if (!url) {
+      toast.error("Enter your product or company website URL first.");
+      return;
+    }
+    setIsFetchingWebsite(true);
+    try {
+      const info = await api.extractProductFromWebsite(url);
+      if (info.name) setName(info.name);
+      if (info.description) setDescription(info.description);
+      if (info.targetMarket) setTargetMarket(info.targetMarket);
+      if (info.valueProposition) setValueProposition(info.valueProposition);
+      toast.success("Product details pulled from the website", {
+        description: "Review and edit anything before creating the product.",
+      });
+    } catch (e) {
+      toast.error("Could not read the website", {
+        description: e instanceof Error ? e.message : undefined,
+      });
+    } finally {
+      setIsFetchingWebsite(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,6 +117,46 @@ function RegisterProductScreen({ onCreated }: { onCreated: () => void }) {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-lg border border-accent-500/25 bg-accent-50/40 dark:bg-accent-500/5 p-3 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5 text-accent-500" />
+                <span className="text-xs font-bold text-text-primary">Auto-fill from your website</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleFetchFromWebsite();
+                    }
+                  }}
+                  placeholder="e.g. acme.com or acme.com/product"
+                  className={inputClass}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleFetchFromWebsite}
+                  disabled={isFetchingWebsite}
+                  className="shrink-0 gap-1.5"
+                >
+                  {isFetchingWebsite ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-3.5 w-3.5 text-accent-500" />
+                  )}
+                  <span>{isFetchingWebsite ? "Reading…" : "Fetch details"}</span>
+                </Button>
+              </div>
+              <p className="text-[10px] text-text-tertiary">
+                We&apos;ll read your site and fill in the fields below — review and adjust them before creating the product.
+              </p>
+            </div>
+
             <div className="space-y-1.5">
               <label htmlFor="product-name" className="text-[11px] font-semibold text-text-secondary">
                 Product name <span className="text-risk-500">*</span>

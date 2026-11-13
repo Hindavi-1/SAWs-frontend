@@ -389,6 +389,7 @@ export async function getBuyersForAccount(accountId: string): Promise<Buyer[]> {
           email: b.email,
           emailStatus: b.email_status,
           linkedinUrl: b.linkedin_url,
+          isPlaceholder: Boolean(b.is_placeholder),
           engagementState: "not_contacted" as const,
         }));
       }
@@ -1139,6 +1140,28 @@ export async function getEditableColumns(): Promise<Record<string, string[]>> {
   return data.tables ?? {};
 }
 
+/**
+ * Structure a free-text ICP description into a Canonical ICP before a discovery
+ * run, so geography and targeting are derived from what the user actually wrote
+ * instead of a generic placeholder. Returns null when the backend cannot parse it.
+ */
+export async function parseICP(rawText: string): Promise<any | null> {
+  try {
+    const res = await apiFetch("/api/icp/parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_type: "text", raw_text: rawText }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.canonical_icp ?? null;
+    }
+  } catch {
+    // Caller falls back to a generic segment when parsing is unavailable.
+  }
+  return null;
+}
+
 export async function generateICPFromProduct(payload: GenerateICPInput): Promise<any> {
   try {
     const res = await apiFetch("/api/icp/generate-from-product", {
@@ -1154,7 +1177,19 @@ export async function generateICPFromProduct(payload: GenerateICPInput): Promise
     });
     if (res.ok) {
       const data = await res.json();
-      return data.canonical_icp;
+      // The backend returns one Canonical ICP per detected customer segment
+      // (e.g. individual investors, advisory firms, banks). Keep the first as
+      // the primary so single-ICP consumers keep working, and surface the full
+      // per-segment list so callers can present every target segment.
+      const all: any[] = Array.isArray(data.canonical_icps) ? data.canonical_icps : [];
+      const primary = data.canonical_icp ?? all[0] ?? null;
+      if (primary) {
+        return {
+          ...primary,
+          canonical_icps: all.length > 0 ? all : [primary],
+          segments: data.segments ?? [],
+        };
+      }
     }
   } catch {
     // Fallback
@@ -1543,6 +1578,7 @@ export async function identifyBuyers(accountId: string): Promise<Buyer[]> {
       seniority: (b.seniority || b.seniority_level || "Director") as Buyer["seniority"],
       email: b.email,
       linkedinUrl: b.linkedin_url,
+      isPlaceholder: Boolean(b.is_placeholder),
       engagementState: "not_contacted" as const,
     }));
   }
@@ -1617,13 +1653,20 @@ export interface PlaceSuggestion {
   secondary_text: string;
 }
 
-export async function getPlacesAutocomplete(q: string, limit = 5): Promise<PlaceSuggestion[]> {
+export async function getPlacesAutocomplete(
+  q: string,
+  limit = 5,
+  sessionToken?: string
+): Promise<PlaceSuggestion[]> {
   if (!q.trim()) return [];
   try {
-    const res = await apiFetch(
-      `/api/places/autocomplete?q=${encodeURIComponent(q)}&limit=${limit}`,
-      { cache: "no-store" }
-    );
+    const params = new URLSearchParams({ q, limit: String(limit) });
+    // A shared token groups one typing session for billing; Google then charges
+    // the whole session as a single unit instead of per keystroke.
+    if (sessionToken) params.set("session_token", sessionToken);
+    const res = await apiFetch(`/api/places/autocomplete?${params.toString()}`, {
+      cache: "no-store",
+    });
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.suggestions) ? data.suggestions : [];

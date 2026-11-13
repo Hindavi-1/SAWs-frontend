@@ -172,6 +172,9 @@ export interface Buyer {
   email?: string;
   emailStatus?: "verified" | "pattern_deduced" | "public_discovered" | "unresolved";
   linkedinUrl?: string;
+  // True when this is a role-based placeholder (no named decision maker was
+  // found), so the contact is not a real person and outreach is call-first.
+  isPlaceholder?: boolean;
   engagementState: "not_contacted" | "contacted" | "replied" | "meeting_booked" | "unresponsive";
 }
 
